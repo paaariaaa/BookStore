@@ -1,5 +1,8 @@
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.conf import settings
+from django.core.files.storage import default_storage
+from django.test import RequestFactory, TestCase
+from django.views.static import serve
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -80,3 +83,26 @@ class FavoriteApiTests(TestCase):
         self.assertTrue(
             Favorite.objects.filter(user=self.other_user, book=self.book).exists()
         )
+
+
+class BookMediaTests(TestCase):
+    image_name = "books/default-cover.png"
+
+    def test_book_without_uploaded_image_uses_served_default_cover(self):
+        book = Book.objects.create(
+            title="Book with cover",
+            author="Test Author",
+        )
+
+        self.assertEqual(book.image.name, self.image_name)
+        self.assertTrue(default_storage.exists(book.image.name))
+
+        request = RequestFactory().get(book.image.url)
+        response = serve(
+            request,
+            path=book.image.name,
+            document_root=settings.MEDIA_ROOT,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["content-type"], "image/png")

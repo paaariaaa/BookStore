@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { books as bookData } from '../constants/mockData';
-import { apiRequest, getArrayPayload } from '../services/api';
+import PropTypes from 'prop-types';
+import { apiRequest, getArrayPayload, getStoredAuthToken } from '../services/api';
 import BookCard from './BookCard';
 import styles from './Books.module.css';
 import SearchBox from './SearchBox';
@@ -9,8 +9,8 @@ import SideCard from './SideCard';
 const getFavoriteStatus = (book) => book.isFavorite ?? book.is_favorite;
 
 function Book({ isBookFavorite = getFavoriteStatus, onOpenBook, onToggleFavorite }) {
-	const [sourceBooks, setSourceBooks] = useState(bookData);
-	const [books, setBooks] = useState(bookData);
+	const [sourceBooks, setSourceBooks] = useState([]);
+	const [books, setBooks] = useState([]);
 	const [search, setSearch] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [fetchError, setFetchError] = useState('');
@@ -24,13 +24,25 @@ function Book({ isBookFavorite = getFavoriteStatus, onOpenBook, onToggleFavorite
 			setFetchError('');
 
 			try {
-				const payload = await apiRequest('/api/books');
+				const [payload, favoritesPayload] = await Promise.all([
+					apiRequest('/api/books/'),
+					getStoredAuthToken()
+						? apiRequest('/api/books/favorites/').catch(() => [])
+						: Promise.resolve([]),
+				]);
 				const loadedBooks = getArrayPayload(payload);
+				const favoriteIds = new Set(
+					getArrayPayload(favoritesPayload).map((book) => String(book.id))
+				);
+				const normalizedBooks = loadedBooks.map((book) => ({
+					...book,
+					is_favorite: favoriteIds.has(String(book.id)) || Boolean(book.is_favorite),
+				}));
 
-				if (!isActive || !loadedBooks.length) return;
+				if (!isActive) return;
 
-				setSourceBooks(loadedBooks);
-				setBooks(loadedBooks);
+				setSourceBooks(normalizedBooks);
+				setBooks(normalizedBooks);
 			} catch (error) {
 				if (isActive) setFetchError(error.message);
 			} finally {
@@ -61,9 +73,10 @@ function Book({ isBookFavorite = getFavoriteStatus, onOpenBook, onToggleFavorite
 		<>
 			<SearchBox search={search} setSearch={setSearch} searchHandler={searchHandler} />
 			{isLoading && <p className={styles.status}>Syncing the latest shelf...</p>}
-			{fetchError && <p className={`${styles.status} ${styles.error}`}>Server is unavailable, showing the local shelf.</p>}
+			{fetchError && <p className={`${styles.status} ${styles.error}`}>Could not reach the bookstore server. Please try again.</p>}
 			<div className={styles.container}>
 				<div className={styles.cards}>
+					{!isLoading && !fetchError && !books.length && <p className={styles.status}>No books have been added yet.</p>}
 					{books.map(book => (
 						<BookCard
 							key={book.id}
@@ -83,5 +96,11 @@ function Book({ isBookFavorite = getFavoriteStatus, onOpenBook, onToggleFavorite
 		</>
 	)
 }
+
+Book.propTypes = {
+	isBookFavorite: PropTypes.func,
+	onOpenBook: PropTypes.func.isRequired,
+	onToggleFavorite: PropTypes.func.isRequired,
+};
 
 export default Book

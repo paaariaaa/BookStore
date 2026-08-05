@@ -3,15 +3,16 @@ import { useEffect, useState } from 'react';
 import AuthBook from './Components/AuthBook';
 import Book from './Components/Book';
 import BookDetails from './Components/BookDetails';
-import { books as bookData } from './constants/mockData';
 import Layout from './Layout/Layout';
 import {
   apiRequest,
   clearAuthToken,
-  extractAuthToken,
   getSinglePayload,
   getStoredAuthToken,
-  saveAuthToken,
+  getStoredRefreshToken,
+  getStoredUser,
+  saveAuthTokens,
+  saveStoredUser,
 } from './services/api';
 
 const getCurrentPath = () => {
@@ -45,14 +46,13 @@ const getFavoriteStatus = (book = {}) => book.isFavorite ?? book.is_favorite;
 
 function App() {
   const [route, setRoute] = useState(getCurrentPath);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [favoriteOverrides, setFavoriteOverrides] = useState({});
 
   const isAuthRoute = route === '/login' || route === '/register';
   const isBookDetailsRoute = route.startsWith('/books/');
   const authMode = route === '/register' ? 'register' : 'login';
   const bookId = isBookDetailsRoute ? route.replace('/books/', '') : '';
-  const selectedBook = bookData.find((book) => String(book.id) === bookId);
 
   useEffect(() => {
     const token = getStoredAuthToken();
@@ -60,11 +60,18 @@ function App() {
 
     if (!token) return undefined;
 
-    apiRequest('/api/auth/profile')
+    apiRequest('/api/auth/profile/')
       .then((profile) => {
-        if (isActive) setCurrentUser(createUserProfile(profile));
+        if (isActive) {
+          const user = createUserProfile(profile);
+          setCurrentUser(user);
+          saveStoredUser(user);
+        }
       })
-      .catch(() => clearAuthToken());
+      .catch(() => {
+        clearAuthToken();
+        if (isActive) setCurrentUser(null);
+      });
 
     return () => {
       isActive = false;
@@ -76,9 +83,19 @@ function App() {
       setRoute(getCurrentPath());
     }
 
-    window.addEventListener('popstate', popStateHandler);
+    const sessionExpiredHandler = () => {
+      setCurrentUser(null);
+      setFavoriteOverrides({});
+      navigate('/login');
+    }
 
-    return () => window.removeEventListener('popstate', popStateHandler);
+    window.addEventListener('popstate', popStateHandler);
+	window.addEventListener('book-app:session-expired', sessionExpiredHandler);
+
+	return () => {
+		window.removeEventListener('popstate', popStateHandler);
+		window.removeEventListener('book-app:session-expired', sessionExpiredHandler);
+	};
   }, []);
 
   const navigate = (nextPath) => {
@@ -98,67 +115,89 @@ function App() {
     return Boolean(getFavoriteStatus(book));
   }
 
-  const toggleFavorite = (book = {}) => {
+  const toggleFavorite = async (book = {}) => {
     const bookKey = String(book.id || '');
 
     if (!bookKey) return;
 
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+
+    const wasFavorite = isBookFavorite(book);
+
     setFavoriteOverrides((currentOverrides) => ({
       ...currentOverrides,
-      [bookKey]: Object.prototype.hasOwnProperty.call(currentOverrides, bookKey)
-        ? !currentOverrides[bookKey]
-        : !Boolean(getFavoriteStatus(book)),
+      [bookKey]: !wasFavorite,
     }));
+
+    try {
+      await apiRequest(`/api/books/${bookKey}/favorite/`, {
+        method: wasFavorite ? 'DELETE' : 'POST',
+      });
+    } catch {
+      setFavoriteOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [bookKey]: wasFavorite,
+      }));
+    }
   }
 
   const loginHandler = async (credentials) => {
-    const response = await apiRequest('/api/auth/login', {
+    const response = await apiRequest('/api/auth/login/', {
       body: credentials,
       method: 'POST',
+      retryOnUnauthorized: false,
+      token: '',
     });
-    const token = extractAuthToken(response);
-    let profile = response;
 
-    if (token) {
-      saveAuthToken(token);
-
-      try {
-        profile = await apiRequest('/api/auth/profile');
-      } catch {
-        profile = response;
-      }
+    if (!saveAuthTokens(response)) {
+      throw new Error('The server did not return a complete authentication session.');
     }
 
-    setCurrentUser(createUserProfile(profile, credentials));
+    const user = createUserProfile(response.user, credentials);
+    setCurrentUser(user);
+    saveStoredUser(user);
     navigate('/');
   }
 
   const registerHandler = async (registerData) => {
-    const response = await apiRequest('/api/auth/register', {
+    const response = await apiRequest('/api/auth/register/', {
       body: registerData,
       method: 'POST',
+      retryOnUnauthorized: false,
+      token: '',
     });
-    const token = extractAuthToken(response);
-    let profile = response;
 
-    if (token) {
-      saveAuthToken(token);
-
-      try {
-        profile = await apiRequest('/api/auth/profile');
-      } catch {
-        profile = response;
-      }
+    if (!saveAuthTokens(response)) {
+      throw new Error('The server did not return a complete authentication session.');
     }
 
-    setCurrentUser(createUserProfile(profile, registerData));
+    const user = createUserProfile(response.user, registerData);
+    setCurrentUser(user);
+    saveStoredUser(user);
     navigate('/');
   }
 
-  const logoutHandler = () => {
-    clearAuthToken();
-    setCurrentUser(null);
-    navigate('/');
+  const logoutHandler = async () => {
+    const refresh = getStoredRefreshToken();
+
+    try {
+      if (refresh) {
+        await apiRequest('/api/auth/logout/', {
+          body: { refresh },
+          method: 'POST',
+          retryOnUnauthorized: false,
+          token: '',
+        });
+      }
+    } finally {
+      clearAuthToken();
+      setCurrentUser(null);
+      setFavoriteOverrides({});
+      navigate('/');
+    }
   }
 
   return (
@@ -178,7 +217,7 @@ function App() {
         />
       ) : isBookDetailsRoute ? (
         <BookDetails
-          book={selectedBook}
+          book={null}
           bookId={bookId}
           isBookFavorite={isBookFavorite}
           onBack={() => navigate('/')}

@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import {
 	IoBookOutline,
 	IoLibraryOutline,
@@ -70,5 +71,17 @@ function Layout({ children, currentUser, onHomeClick, onLoginClick, onLogout, on
 		</>
 	)
 }
+
+Layout.propTypes = {
+	children: PropTypes.node.isRequired,
+	currentUser: PropTypes.shape({
+		displayName: PropTypes.string.isRequired,
+		username: PropTypes.string.isRequired,
+	}),
+	onHomeClick: PropTypes.func.isRequired,
+	onLoginClick: PropTypes.func.isRequired,
+	onLogout: PropTypes.func.isRequired,
+	onRegisterClick: PropTypes.func.isRequired,
+};
 
 export default Layout

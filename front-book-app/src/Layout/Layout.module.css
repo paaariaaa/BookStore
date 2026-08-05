@@ -51,6 +51,30 @@
 	min-width: 0;
 }
 
+.cartButton {
+	position: relative;
+	height: 50px;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 0 10px 0 13px;
+	border: 1px solid rgba(224, 224, 224, 0.1);
+	border-radius: 10px;
+	background: #262626;
+	color: #e8e5dc;
+	font-size: 0.8rem;
+	font-weight: 900;
+	cursor: pointer;
+	transition: transform .2s ease, border-color .2s ease, background .2s ease;
+}
+
+.cartButton:hover { transform: translateY(-2px); border-color: rgba(47,184,166,.5); background: #2b342f; }
+.cartButton > svg { color: #2fb8a6; font-size: 1.25rem; }
+.cartButton b { min-width: 23px; height: 23px; display: grid; place-items: center; padding: 0 5px; border-radius: 8px; background: rgba(224,224,224,.08); color: #aaa; font-size: .68rem; transition: .25s ease; }
+.cartButton .cartCountActive { background: #f25f5c; color: white; box-shadow: 0 6px 14px rgba(242,95,92,.25); animation: cartCountPop .35s ease; }
+
+@keyframes cartCountPop { 50% { transform: scale(1.18); } }
+
 .accountCard {
 	position: relative;
 	display: inline-flex;
@@ -190,6 +214,9 @@
 		width: 100%;
 	}
 
+	.headerTools { flex-wrap: wrap; }
+	.cartButton { flex: 0 0 auto; }
+
 	.accountCard {
 		flex-wrap: wrap;
 	}
@@ -200,9 +227,12 @@
 }
 
 @media (max-width: 460px) {
+	.cartButton { width: 100%; justify-content: center; }
 	.loginButton,
 	.joinButton,
 	.logoutButton {
 		flex: 1;
 	}
 }
+
+@media (prefers-reduced-motion: reduce) { .cartButton, .cartButton b { transition: none; animation: none; } }

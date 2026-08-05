@@ -44,6 +44,22 @@ const createUserProfile = (payload, fallback = {}) => {
 };
 
 const getFavoriteStatus = (book = {}) => book.isFavorite ?? book.is_favorite;
+const GUEST_CART_KEY = 'book-app-guest-cart';
+
+const getGuestCart = () => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const value = JSON.parse(window.localStorage.getItem(GUEST_CART_KEY));
+    return Array.isArray(value) ? value.filter((item) => item?.id && item?.quantity > 0) : [];
+  } catch {
+    window.localStorage.removeItem(GUEST_CART_KEY);
+    return [];
+  }
+};
+
+const saveGuestCart = (cart) => {
+  window.localStorage.setItem(GUEST_CART_KEY, JSON.stringify(cart));
+};
 const normalizeCart = (payload = {}) => (payload.items || []).map((item) => ({
   ...item.book,
   lineTotal: String(item.line_total ?? '0.00'),
@@ -54,7 +70,7 @@ function App() {
   const [route, setRoute] = useState(getCurrentPath);
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [favoriteOverrides, setFavoriteOverrides] = useState({});
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(getGuestCart);
   const [cartSubtotal, setCartSubtotal] = useState('0.00');
   const [cartError, setCartError] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -64,6 +80,9 @@ function App() {
   const authMode = route === '/register' ? 'register' : 'login';
   const bookId = isBookDetailsRoute ? route.replace('/books/', '') : '';
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+  const displayedCartSubtotal = currentUser
+    ? cartSubtotal
+    : String(cart.reduce((total, item) => total + Number(item.price || 0) * item.quantity, 0));
 
   const applyCartResponse = useCallback((payload) => {
     setCart(normalizeCart(payload));
@@ -75,14 +94,27 @@ function App() {
     let isActive = true;
 
     if (!currentUser) {
-      setCart([]);
+      setCart(getGuestCart());
       setCartSubtotal('0.00');
       return undefined;
     }
 
-    apiRequest('/api/books/cart/')
+    const guestCart = getGuestCart();
+    const request = guestCart.length
+      ? apiRequest('/api/books/cart/sync/', {
+          body: {
+            items: guestCart.map((item) => ({ book_id: item.id, quantity: item.quantity })),
+          },
+          method: 'POST',
+        })
+      : apiRequest('/api/books/cart/');
+
+    request
       .then((payload) => {
-        if (isActive) applyCartResponse(payload);
+        if (isActive) {
+          window.localStorage.removeItem(GUEST_CART_KEY);
+          applyCartResponse(payload);
+        }
       })
       .catch((error) => {
         if (isActive) setCartError(error.message);
@@ -150,7 +182,16 @@ function App() {
     if (!book.id) return;
 
     if (!currentUser) {
-      navigate('/login');
+      setCart((currentCart) => {
+        const existing = currentCart.find((item) => String(item.id) === String(book.id));
+        const nextCart = existing
+          ? currentCart.map((item) => String(item.id) === String(book.id)
+              ? { ...item, quantity: item.quantity + 1 }
+              : item)
+          : [...currentCart, { ...book, quantity: 1 }];
+        saveGuestCart(nextCart);
+        return nextCart;
+      });
       return;
     }
 
@@ -170,6 +211,17 @@ function App() {
     if (!item) return;
     const nextQuantity = item.quantity + amount;
 
+    if (!currentUser) {
+      const nextCart = cart
+        .map((entry) => String(entry.id) === String(bookIdToChange)
+          ? { ...entry, quantity: nextQuantity }
+          : entry)
+        .filter((entry) => entry.quantity > 0);
+      saveGuestCart(nextCart);
+      setCart(nextCart);
+      return;
+    }
+
     try {
       const payload = await apiRequest(`/api/books/cart/items/${bookIdToChange}/`, {
         body: nextQuantity > 0 ? { quantity: nextQuantity } : undefined,
@@ -182,6 +234,13 @@ function App() {
   };
 
   const removeFromCart = async (bookIdToRemove) => {
+    if (!currentUser) {
+      const nextCart = cart.filter((item) => String(item.id) !== String(bookIdToRemove));
+      saveGuestCart(nextCart);
+      setCart(nextCart);
+      return;
+    }
+
     try {
       const payload = await apiRequest(`/api/books/cart/items/${bookIdToRemove}/`, {
         method: 'DELETE',
@@ -193,6 +252,12 @@ function App() {
   };
 
   const clearCart = async () => {
+    if (!currentUser) {
+      saveGuestCart([]);
+      setCart([]);
+      return;
+    }
+
     try {
       const payload = await apiRequest('/api/books/cart/', { method: 'DELETE' });
       applyCartResponse(payload);
@@ -319,7 +384,7 @@ function App() {
         onRemove={removeFromCart}
         onClear={clearCart}
         error={cartError}
-        subtotal={cartSubtotal}
+        subtotal={displayedCartSubtotal}
       />
       {isAuthRoute ? (
         <AuthBook

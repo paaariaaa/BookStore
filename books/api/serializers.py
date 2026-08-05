@@ -55,3 +55,18 @@ class AddCartItemSerializer(serializers.Serializer):
 
 class UpdateCartItemSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1, max_value=99)
+
+
+class CartSyncItemSerializer(serializers.Serializer):
+    book_id = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1, max_value=99)
+
+
+class CartSyncSerializer(serializers.Serializer):
+    items = CartSyncItemSerializer(many=True, allow_empty=True)
+
+    def validate_items(self, items):
+        book_ids = [item["book_id"] for item in items]
+        if len(book_ids) != len(set(book_ids)):
+            raise serializers.ValidationError("Each book may appear only once.")
+        return items

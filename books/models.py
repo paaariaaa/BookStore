@@ -12,7 +12,7 @@ class Book(models.Model):
     country = models.CharField(max_length=100, blank=True)
     language = models.CharField(max_length=100, blank=True)
     pages = models.PositiveIntegerField(default=1)
-    price = models.DecimalField(max_digits=10, decimal_places=2, default=9.99)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=300000)
     stock = models.PositiveIntegerField(default=100)
     published_year = models.SmallIntegerField(null=True, blank=True)
     isbn = models.CharField(max_length=13, unique=True, null=True, blank=True)

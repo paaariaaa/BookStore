@@ -9,7 +9,7 @@ import {
 	IoTrashOutline,
 } from 'react-icons/io5';
 
-import { resolveMediaUrl } from '../services/api';
+import { formatToman, resolveMediaUrl } from '../services/api';
 import styles from './CartDrawer.module.css';
 
 function CartDrawer({ cart, error, isOpen, onChangeQuantity, onClear, onClose, onOpenBook, onRemove, subtotal }) {
@@ -55,7 +55,7 @@ function CartDrawer({ cart, error, isOpen, onChangeQuantity, onClear, onClose, o
 										<div className={styles.itemInfo}>
 											<strong>{item.title}</strong>
 											<span>{item.author || 'Unknown author'}</span>
-											<span>${item.price} · ${item.lineTotal}</span>
+											<span>{formatToman(item.price)} · {formatToman(item.lineTotal ?? Number(item.price || 0) * item.quantity)}</span>
 											<div className={styles.quantity} aria-label={`Quantity for ${item.title}`}>
 												<button type="button" onClick={() => onChangeQuantity(item.id, -1)} aria-label={`Decrease ${item.title}`}><IoRemoveOutline /></button>
 												<b>{item.quantity}</b>
@@ -70,7 +70,7 @@ function CartDrawer({ cart, error, isOpen, onChangeQuantity, onClear, onClose, o
 						<footer className={styles.summary}>
 							<div><span>Selected editions</span><strong>{cart.length}</strong></div>
 							<div><span>Total books</span><strong>{totalItems}</strong></div>
-							<div><span>Subtotal</span><strong>${subtotal}</strong></div>
+							<div><span>Subtotal</span><strong>{formatToman(subtotal)}</strong></div>
 							<button type="button" onClick={onClear}>Clear bag</button>
 							<p>Shipping and taxes are calculated during checkout.</p>
 						</footer>

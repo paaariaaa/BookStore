@@ -6,6 +6,7 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 
 from books.models import Book, Cart, CartItem, Favorite
@@ -15,6 +16,7 @@ from .serializers import (
     BookSerializer,
     CartSerializer,
     CartSyncSerializer,
+    FavoriteResponseSerializer,
     UpdateCartItemSerializer,
 )
 
@@ -35,6 +37,9 @@ def with_favorite_status(queryset, user):
     )
 
 
+@extend_schema_view(
+    get=extend_schema(tags=["Books"], summary="List books"),
+)
 class BookListView(ListAPIView):
     serializer_class = BookSerializer
 
@@ -42,6 +47,9 @@ class BookListView(ListAPIView):
         return with_favorite_status(Book.objects.all(), self.request.user)
 
 
+@extend_schema_view(
+    get=extend_schema(tags=["Books"], summary="Retrieve a book"),
+)
 class BookDetailView(RetrieveAPIView):
     serializer_class = BookSerializer
 
@@ -49,6 +57,9 @@ class BookDetailView(RetrieveAPIView):
         return with_favorite_status(Book.objects.all(), self.request.user)
 
 
+@extend_schema_view(
+    get=extend_schema(tags=["Favorites"], summary="List the current user's favorite books"),
+)
 class FavoriteListView(ListAPIView):
     serializer_class = BookSerializer
     permission_classes = [IsAuthenticated]
@@ -64,6 +75,12 @@ class FavoriteListView(ListAPIView):
 class BookFavoriteView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Favorites"],
+        summary="Add a book to favorites",
+        request=None,
+        responses={200: FavoriteResponseSerializer, 201: FavoriteResponseSerializer},
+    )
     def post(self, request, pk):
         book = get_object_or_404(Book, pk=pk)
         _, created = Favorite.objects.get_or_create(
@@ -83,6 +100,12 @@ class BookFavoriteView(APIView):
             ),
         )
 
+    @extend_schema(
+        tags=["Favorites"],
+        summary="Remove a book from favorites",
+        request=None,
+        responses={204: None},
+    )
     def delete(self, request, pk):
         book = get_object_or_404(Book, pk=pk)
 
@@ -111,9 +134,11 @@ def validate_stock(book, quantity):
 class CartView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=["Cart"], summary="Get the current user's cart", responses=CartSerializer)
     def get(self, request):
         return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
 
+    @extend_schema(tags=["Cart"], summary="Clear the cart", request=None, responses=CartSerializer)
     @transaction.atomic
     def delete(self, request):
         cart = Cart.objects.select_for_update().filter(user=request.user).first()
@@ -126,6 +151,12 @@ class CartView(APIView):
 class CartItemCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Cart"],
+        summary="Add a book to the cart",
+        request=AddCartItemSerializer,
+        responses={200: CartSerializer, 201: CartSerializer},
+    )
     @transaction.atomic
     def post(self, request):
         serializer = AddCartItemSerializer(data=request.data)
@@ -159,6 +190,12 @@ class CartItemCreateView(APIView):
 class CartItemDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Cart"],
+        summary="Set a cart item's quantity",
+        request=UpdateCartItemSerializer,
+        responses=CartSerializer,
+    )
     @transaction.atomic
     def patch(self, request, book_id):
         serializer = UpdateCartItemSerializer(data=request.data)
@@ -174,6 +211,13 @@ class CartItemDetailView(APIView):
         item.save(update_fields=["quantity", "updated_at"])
         item.cart.save(update_fields=["updated_at"])
         return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+    @extend_schema(
+        tags=["Cart"],
+        summary="Remove a book from the cart",
+        request=None,
+        responses=CartSerializer,
+    )
     @transaction.atomic
     def delete(self, request, book_id):
         cart, _ = Cart.objects.get_or_create(user=request.user)
@@ -188,6 +232,12 @@ class CartItemDetailView(APIView):
 class CartSyncView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Cart"],
+        summary="Merge a guest cart into the current user's cart",
+        request=CartSyncSerializer,
+        responses=CartSerializer,
+    )
     @transaction.atomic
     def post(self, request):
         serializer = CartSyncSerializer(data=request.data)

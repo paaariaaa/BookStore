@@ -1,0 +1,33 @@
+.container {
+	display: flex;
+}
+
+.status {
+	margin: -28px 0 22px;
+	color: #aaa3c9;
+	font-size: 0.86rem;
+	font-weight: 800;
+}
+
+.error {
+	color: #f6b2b0;
+}
+
+.cards {
+	flex: 2.6 1 0;
+	min-height: 100vh;
+}
+
+.favorite {
+	flex: 1 1 0;
+	height: fit-content;
+	padding: 15px;
+	background-color: #6552f4;
+	border-radius: 10px;
+	margin-left: 20px;
+}
+
+.favorite h4 {
+	font-size: 1.2rem;
+	margin-bottom: 0.5rem;
+}

@@ -1,0 +1,27 @@
+.card {
+	display: flex;
+	align-items: center;
+	padding: 5px 10px;
+	margin: 10px 0;
+	background-color: #7c6ee9;
+	border-radius: 5px;
+}
+
+.card img {
+	width: 30px;
+	margin-right: 15px;
+}
+
+.coverFallback {
+	width: 30px;
+	height: 42px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-right: 15px;
+	background: linear-gradient(135deg, #6552f4, #2fb8a6);
+	border-radius: 4px;
+	color: #ffffff;
+	font-size: 0.8rem;
+	font-weight: 900;
+}

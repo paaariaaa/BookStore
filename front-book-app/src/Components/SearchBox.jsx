@@ -1,4 +1,5 @@
 import { IoSearchSharp } from "react-icons/io5"
+import PropTypes from 'prop-types';
 
 import styles from './SearchBox.module.css'
 
@@ -15,5 +16,11 @@ function SearchBox({ search, setSearch, searchHandler }) {
 		</form>
 	)
 }
+
+SearchBox.propTypes = {
+	search: PropTypes.string.isRequired,
+	searchHandler: PropTypes.func.isRequired,
+	setSearch: PropTypes.func.isRequired,
+};
 
 export default SearchBox

@@ -9,7 +9,6 @@ from .views import (
     FavoriteListView,
 )
 
-
 urlpatterns = [
     path("", BookListView.as_view(), name="book-list"),
     path("favorites/", FavoriteListView.as_view(), name="favorite-list"),

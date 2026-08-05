@@ -1,4 +1,5 @@
 import { AiFillHeart } from "react-icons/ai";
+import PropTypes from 'prop-types';
 
 import { resolveMediaUrl } from '../services/api';
 import styles from './BooksCard.module.css';
@@ -44,5 +45,18 @@ function BookCard({ data, isLiked, handleLikedList, onOpenBook }) {
 		</div>
 	)
 }
+
+BookCard.propTypes = {
+	data: PropTypes.shape({
+		author: PropTypes.string,
+		image: PropTypes.string,
+		language: PropTypes.string,
+		pages: PropTypes.number,
+		title: PropTypes.string.isRequired,
+	}).isRequired,
+	handleLikedList: PropTypes.func.isRequired,
+	isLiked: PropTypes.bool.isRequired,
+	onOpenBook: PropTypes.func.isRequired,
+};
 
 export default BookCard

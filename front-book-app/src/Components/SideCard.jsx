@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 import { resolveMediaUrl } from '../services/api';
 import styles from './SideCard.module.css'
 
@@ -11,5 +13,12 @@ function SideCard({ data: { image, title } }) {
 		</div>
 	)
 }
+
+SideCard.propTypes = {
+	data: PropTypes.shape({
+		image: PropTypes.string,
+		title: PropTypes.string.isRequired,
+	}).isRequired,
+};
 
 export default SideCard

@@ -1,7 +1,15 @@
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
-const AUTH_TOKEN_KEY = 'book-app-auth-token';
+const ACCESS_TOKEN_KEY = 'book-app-auth-token';
+const REFRESH_TOKEN_KEY = 'book-app-refresh-token';
+const AUTH_USER_KEY = 'book-app-auth-user';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+let refreshRequest = null;
+
+const notifySessionExpired = () => {
+	clearAuthToken();
+	if (typeof window !== 'undefined') window.dispatchEvent(new Event('book-app:session-expired'));
+};
 
 const parseResponse = async (response) => {
 	const text = await response.text();
@@ -19,10 +27,24 @@ const getErrorMessage = (payload) => {
 	if (!payload) return 'Server request failed.';
 	if (typeof payload === 'string') return payload;
 
-	return payload.detail || payload.message || payload.error || 'Server request failed.';
-};
+	const fieldLabels = {
+		email: 'Email',
+		first_name: 'First name',
+		last_name: 'Last name',
+		password: 'Password',
+		password_confirm: 'Confirm password',
+		username: 'Username',
+	};
+	const fieldEntry = Object.entries(payload).find(([, value]) => {
+		const messages = Array.isArray(value) ? value : [value];
+		return messages.some((message) => typeof message === 'string');
+	});
+	const fieldError = fieldEntry
+		? `${fieldLabels[fieldEntry[0]] || fieldEntry[0]}: ${(Array.isArray(fieldEntry[1]) ? fieldEntry[1] : [fieldEntry[1]]).filter((message) => typeof message === 'string').join(' ')}`
+		: '';
 
-const getNestedValue = (payload, keys) => keys.reduce((value, key) => value?.[key], payload);
+	return payload.detail || payload.message || payload.error || fieldError || 'Server request failed.';
+};
 
 export const apiUrl = (path = '') => {
 	const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -33,23 +55,89 @@ export const apiUrl = (path = '') => {
 export const getStoredAuthToken = () => {
 	if (typeof window === 'undefined') return '';
 
-	return window.localStorage.getItem(AUTH_TOKEN_KEY) || '';
+	return window.localStorage.getItem(ACCESS_TOKEN_KEY) || '';
 };
 
-export const saveAuthToken = (token) => {
-	if (typeof window === 'undefined' || !token) return;
+export const getStoredRefreshToken = () => {
+	if (typeof window === 'undefined') return '';
 
-	window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+	return window.localStorage.getItem(REFRESH_TOKEN_KEY) || '';
+};
+
+export const saveAuthTokens = ({ access, refresh }) => {
+	if (typeof window === 'undefined' || !access || !refresh) return false;
+
+	window.localStorage.setItem(ACCESS_TOKEN_KEY, access);
+	window.localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+	return true;
+};
+
+export const getStoredUser = () => {
+	if (typeof window === 'undefined') return null;
+
+	try {
+		return JSON.parse(window.localStorage.getItem(AUTH_USER_KEY)) || null;
+	} catch {
+		window.localStorage.removeItem(AUTH_USER_KEY);
+		return null;
+	}
+};
+
+export const saveStoredUser = (user) => {
+	if (typeof window === 'undefined' || !user) return;
+
+	window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 };
 
 export const clearAuthToken = () => {
 	if (typeof window === 'undefined') return;
 
-	window.localStorage.removeItem(AUTH_TOKEN_KEY);
+	window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+	window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+	window.localStorage.removeItem(AUTH_USER_KEY);
+};
+
+const refreshAccessToken = async () => {
+	if (refreshRequest) return refreshRequest;
+
+	const currentRefresh = getStoredRefreshToken();
+	if (!currentRefresh) throw new Error('Your session has expired. Please sign in again.');
+
+	refreshRequest = (async () => {
+		const response = await fetch(apiUrl('/api/auth/refresh/'), {
+			method: 'POST',
+			headers: {
+				Accept: 'application/json',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ refresh: currentRefresh }),
+		});
+		const payload = await parseResponse(response);
+
+		if (!response.ok || !payload?.access || !payload?.refresh) {
+			throw new Error(getErrorMessage(payload) || 'Your session has expired.');
+		}
+
+		saveAuthTokens(payload);
+		return payload.access;
+	})().catch((error) => {
+		notifySessionExpired();
+		throw error;
+	}).finally(() => {
+		refreshRequest = null;
+	});
+
+	return refreshRequest;
 };
 
 export const apiRequest = async (path, options = {}) => {
-	const { body, headers = {}, method = 'GET', token = getStoredAuthToken() } = options;
+	const {
+		body,
+		headers = {},
+		method = 'GET',
+		retryOnUnauthorized = true,
+		token = getStoredAuthToken(),
+	} = options;
 	const isFormData = body instanceof FormData;
 	const requestHeaders = {
 		Accept: 'application/json',
@@ -71,6 +159,16 @@ export const apiRequest = async (path, options = {}) => {
 	});
 	const payload = await parseResponse(response);
 
+	if (response.status === 401 && retryOnUnauthorized && getStoredRefreshToken()) {
+		const freshAccess = await refreshAccessToken();
+
+		return apiRequest(path, {
+			...options,
+			retryOnUnauthorized: false,
+			token: freshAccess,
+		});
+	}
+
 	if (!response.ok) {
 		const error = new Error(getErrorMessage(payload));
 		error.status = response.status;
@@ -79,24 +177,6 @@ export const apiRequest = async (path, options = {}) => {
 	}
 
 	return payload;
-};
-
-export const extractAuthToken = (payload) => {
-	const tokenCandidates = [
-		payload?.token,
-		payload?.access,
-		payload?.access_token,
-		payload?.authToken,
-		payload?.auth_token,
-		payload?.jwt,
-		getNestedValue(payload, ['data', 'token']),
-		getNestedValue(payload, ['data', 'access']),
-		getNestedValue(payload, ['data', 'access_token']),
-		getNestedValue(payload, ['data', 'auth_token']),
-		getNestedValue(payload, ['user', 'token']),
-	];
-
-	return tokenCandidates.find(Boolean) || '';
 };
 
 export const getArrayPayload = (payload) => {
@@ -116,7 +196,12 @@ export const getSinglePayload = (payload) => {
 
 export const resolveMediaUrl = (path) => {
 	if (!path) return '';
-	if (/^(https?:|data:|blob:)/i.test(path)) return path;
 
-	return apiUrl(path);
+	const normalizedPath = String(path).trim();
+	const markdownUrl = normalizedPath.match(/^\[[^\]]*\]\((https?:\/\/[^)]+)\)$/i)?.[1];
+	const mediaPath = markdownUrl || normalizedPath;
+
+	if (/^(https?:|data:|blob:)/i.test(mediaPath)) return mediaPath;
+
+	return apiUrl(mediaPath);
 };

@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import {
 	IoArrowBackOutline,
 	IoBarcodeOutline,
 	IoBookOutline,
 	IoCalendarOutline,
-	IoDocumentTextOutline,
 	IoHeartOutline,
 	IoHeartSharp,
+	IoHourglassOutline,
 	IoLanguageOutline,
 	IoLayersOutline,
 	IoTimeOutline,
 } from 'react-icons/io5';
 
-import { books as fallbackBooks } from '../constants/mockData';
 import { apiRequest, getArrayPayload, getSinglePayload, resolveMediaUrl } from '../services/api';
 import styles from './BookDetails.module.css';
 
@@ -102,7 +102,7 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 			setIsLoading(true);
 
 			try {
-				const payload = await apiRequest(`/api/books/${bookId}`);
+				const payload = await apiRequest(`/api/books/${bookId}/`);
 				const nextBook = getSinglePayload(payload);
 
 				if (isActive && nextBook) setServerBook(nextBook);
@@ -127,12 +127,12 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 			setCatalogLoading(true);
 
 			try {
-				const payload = await apiRequest('/api/books');
+				const payload = await apiRequest('/api/books/');
 				const nextBooks = getArrayPayload(payload);
 
-				if (isActive) setCatalogBooks(nextBooks.length ? nextBooks : fallbackBooks);
+				if (isActive) setCatalogBooks(nextBooks);
 			} catch {
-				if (isActive) setCatalogBooks(fallbackBooks);
+				if (isActive) setCatalogBooks([]);
 			} finally {
 				if (isActive) setCatalogLoading(false);
 			}
@@ -177,10 +177,15 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 	const description = parseDescription(details.description);
 	const coverImage = resolveMediaUrl(details.image);
 	const isFavorite = isBookFavorite(serverBook);
-	const catalog = catalogBooks.length ? catalogBooks : fallbackBooks;
-	const relatedBooks = catalog
+	const relatedBooks = catalogBooks
 		.filter((item) => String(item.id) !== String(details.id))
 		.slice(0, 6);
+	const accentHue = 18 + (Number(details.id) * 47) % 210;
+	const productTheme = {
+		'--book-accent': `hsl(${accentHue} 62% 54%)`,
+		'--book-accent-soft': `hsl(${accentHue} 54% 36%)`,
+	};
+	const readingHours = details.pages ? Math.max(1, Math.round(details.pages / 40)) : null;
 	const detailItems = [
 		{
 			icon: IoLanguageOutline,
@@ -205,7 +210,7 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 	];
 
 	return (
-		<main className={styles.details}>
+		<main className={styles.details} style={productTheme}>
 			<button className={styles.backButton} type="button" onClick={onBack}>
 				<IoArrowBackOutline />
 				Back to books
@@ -214,6 +219,7 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 
 			<section className={styles.hero}>
 				<div className={styles.coverWrap}>
+					<div className={styles.pageFan} aria-hidden="true"><i /><i /><i /></div>
 					<div className={styles.bookCover}>
 						<div className={styles.coverSpine} />
 						{coverImage ? <img src={coverImage} alt={details.title} /> : <div className={styles.coverPlaceholder}>{details.title}</div>}
@@ -270,10 +276,10 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 
 			<section className={styles.timeline}>
 				<div className={styles.note}>
-					<IoDocumentTextOutline />
+					<IoHourglassOutline />
 					<div>
-						<span>Shelf impression</span>
-						<p>{details.title} is presented as a carefully selected title with a clear place in the store catalog.</p>
+						<span>Estimated reading time</span>
+						<p>{readingHours ? `Around ${readingHours} focused hours for ${details.pages} pages.` : 'Page count is needed to estimate reading time.'}</p>
 					</div>
 				</div>
 
@@ -331,5 +337,14 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 		</main>
 	)
 }
+
+BookDetails.propTypes = {
+	book: PropTypes.object,
+	bookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+	isBookFavorite: PropTypes.func,
+	onBack: PropTypes.func.isRequired,
+	onOpenBook: PropTypes.func.isRequired,
+	onToggleFavorite: PropTypes.func.isRequired,
+};
 
 export default BookDetails;

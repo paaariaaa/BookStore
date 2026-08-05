@@ -9,6 +9,9 @@ class BookSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def get_is_favorite(self, obj):
+        if hasattr(obj, "_is_favorite"):
+            return obj._is_favorite
+
         request = self.context.get("request")
 
         if request and request.user.is_authenticated:

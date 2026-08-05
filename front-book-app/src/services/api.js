@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const DEFAULT_API_BASE_URL = '';
 const ACCESS_TOKEN_KEY = 'book-app-auth-token';
 const REFRESH_TOKEN_KEY = 'book-app-refresh-token';
 const AUTH_USER_KEY = 'book-app-auth-user';

@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import BooleanField, Exists, OuterRef, Value
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -7,9 +8,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 
-from books.models import Book, Favorite
+from books.models import Book, Cart, CartItem, Favorite
 
-from .serializers import BookSerializer
+from .serializers import (
+    AddCartItemSerializer,
+    BookSerializer,
+    CartSerializer,
+    UpdateCartItemSerializer,
+)
 
 
 def with_favorite_status(queryset, user):
@@ -85,3 +91,96 @@ class BookFavoriteView(APIView):
         ).delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def get_cart(user):
+    cart, _ = Cart.objects.get_or_create(user=user)
+    return Cart.objects.prefetch_related("items__book").get(pk=cart.pk)
+
+
+def validate_stock(book, quantity):
+    if quantity > book.stock:
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError(
+            {"quantity": f"Only {book.stock} copies are available."}
+        )
+
+
+class CartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+    @transaction.atomic
+    def delete(self, request):
+        cart = Cart.objects.select_for_update().filter(user=request.user).first()
+        if cart:
+            cart.items.all().delete()
+            cart.save(update_fields=["updated_at"])
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+
+class CartItemCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = AddCartItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        book = get_object_or_404(
+            Book.objects.select_for_update(),
+            pk=serializer.validated_data["book_id"],
+        )
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        item = CartItem.objects.select_for_update().filter(cart=cart, book=book).first()
+        quantity = serializer.validated_data["quantity"] + (item.quantity if item else 0)
+        validate_stock(book, quantity)
+
+        if item:
+            item.quantity = quantity
+            item.save(update_fields=["quantity", "updated_at"])
+            response_status = status.HTTP_200_OK
+        else:
+            CartItem.objects.create(cart=cart, book=book, quantity=quantity)
+            response_status = status.HTTP_201_CREATED
+
+        cart.save(update_fields=["updated_at"])
+
+        return Response(
+            CartSerializer(get_cart(request.user), context={"request": request}).data,
+            status=response_status,
+        )
+
+
+class CartItemDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def patch(self, request, book_id):
+        serializer = UpdateCartItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = get_object_or_404(
+            CartItem.objects.select_for_update().select_related("book", "cart"),
+            cart__user=request.user,
+            book_id=book_id,
+        )
+        quantity = serializer.validated_data["quantity"]
+        validate_stock(item.book, quantity)
+        item.quantity = quantity
+        item.save(update_fields=["quantity", "updated_at"])
+        item.cart.save(update_fields=["updated_at"])
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+    @transaction.atomic
+    def delete(self, request, book_id):
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        CartItem.objects.select_for_update().filter(
+            cart=cart,
+            book_id=book_id,
+        ).delete()
+        cart.save(update_fields=["updated_at"])
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)

@@ -12,7 +12,7 @@ import {
 import { resolveMediaUrl } from '../services/api';
 import styles from './CartDrawer.module.css';
 
-function CartDrawer({ cart, isOpen, onChangeQuantity, onClose, onOpenBook, onRemove }) {
+function CartDrawer({ cart, error, isOpen, onChangeQuantity, onClear, onClose, onOpenBook, onRemove, subtotal }) {
 	const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
 
 	useEffect(() => {
@@ -44,6 +44,7 @@ function CartDrawer({ cart, isOpen, onChangeQuantity, onClose, onOpenBook, onRem
 				{cart.length ? (
 					<>
 						<div className={styles.items}>
+							{error && <p role="alert">{error}</p>}
 							{cart.map((item) => {
 								const cover = resolveMediaUrl(item.image);
 								return (
@@ -54,6 +55,7 @@ function CartDrawer({ cart, isOpen, onChangeQuantity, onClose, onOpenBook, onRem
 										<div className={styles.itemInfo}>
 											<strong>{item.title}</strong>
 											<span>{item.author || 'Unknown author'}</span>
+											<span>${item.price} · ${item.lineTotal}</span>
 											<div className={styles.quantity} aria-label={`Quantity for ${item.title}`}>
 												<button type="button" onClick={() => onChangeQuantity(item.id, -1)} aria-label={`Decrease ${item.title}`}><IoRemoveOutline /></button>
 												<b>{item.quantity}</b>
@@ -68,7 +70,9 @@ function CartDrawer({ cart, isOpen, onChangeQuantity, onClose, onOpenBook, onRem
 						<footer className={styles.summary}>
 							<div><span>Selected editions</span><strong>{cart.length}</strong></div>
 							<div><span>Total books</span><strong>{totalItems}</strong></div>
-							<p>Prices and checkout will appear when pricing is available from the bookstore.</p>
+							<div><span>Subtotal</span><strong>${subtotal}</strong></div>
+							<button type="button" onClick={onClear}>Clear bag</button>
+							<p>Shipping and taxes are calculated during checkout.</p>
 						</footer>
 					</>
 				) : (
@@ -89,14 +93,19 @@ CartDrawer.propTypes = {
 		author: PropTypes.string,
 		id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
 		image: PropTypes.string,
+		lineTotal: PropTypes.string,
+		price: PropTypes.string,
 		quantity: PropTypes.number.isRequired,
 		title: PropTypes.string.isRequired,
 	})).isRequired,
+	error: PropTypes.string.isRequired,
 	isOpen: PropTypes.bool.isRequired,
 	onChangeQuantity: PropTypes.func.isRequired,
+	onClear: PropTypes.func.isRequired,
 	onClose: PropTypes.func.isRequired,
 	onOpenBook: PropTypes.func.isRequired,
 	onRemove: PropTypes.func.isRequired,
+	subtotal: PropTypes.string.isRequired,
 };
 
 export default CartDrawer;

@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from books.models import Book, Favorite
+from books.models import Book, CartItem, Favorite
 
 
 class FavoriteApiTests(TestCase):
@@ -106,3 +106,72 @@ class BookMediaTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response["content-type"], "image/png")
+
+
+class CartApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username="cart-user", password="password-123")
+        self.other_user = User.objects.create_user(username="other-cart-user", password="password-123")
+        self.book = Book.objects.create(
+            title="Cart Book",
+            author="Author",
+            price="12.50",
+            stock=3,
+        )
+
+    def authenticate(self, user=None):
+        token = RefreshToken.for_user(user or self.user).access_token
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    def test_cart_requires_authentication(self):
+        self.assertEqual(self.client.get("/api/books/cart/").status_code, 401)
+        self.assertEqual(self.client.post("/api/books/cart/items/", {}).status_code, 401)
+
+    def test_add_update_remove_and_clear_cart(self):
+        self.authenticate()
+        add_url = "/api/books/cart/items/"
+
+        created = self.client.post(add_url, {"book_id": self.book.pk, "quantity": 1}, format="json")
+        incremented = self.client.post(add_url, {"book_id": self.book.pk, "quantity": 1}, format="json")
+        updated = self.client.patch(
+            f"/api/books/cart/items/{self.book.pk}/",
+            {"quantity": 3},
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(incremented.status_code, 200)
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.data["total_items"], 3)
+        self.assertEqual(str(updated.data["subtotal"]), "37.50")
+        self.assertEqual(CartItem.objects.count(), 1)
+
+        removed = self.client.delete(f"/api/books/cart/items/{self.book.pk}/")
+        self.assertEqual(removed.status_code, 200)
+        self.assertEqual(removed.data["items"], [])
+
+        self.client.post(add_url, {"book_id": self.book.pk}, format="json")
+        cleared = self.client.delete("/api/books/cart/")
+        self.assertEqual(cleared.status_code, 200)
+        self.assertEqual(cleared.data["total_items"], 0)
+
+    def test_stock_limit_is_enforced(self):
+        self.authenticate()
+        response = self.client.post(
+            "/api/books/cart/items/",
+            {"book_id": self.book.pk, "quantity": 4},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("quantity", response.data)
+
+    def test_users_have_isolated_carts(self):
+        self.authenticate()
+        self.client.post("/api/books/cart/items/", {"book_id": self.book.pk}, format="json")
+        self.authenticate(self.other_user)
+
+        response = self.client.get("/api/books/cart/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["items"], [])

@@ -6,11 +6,17 @@ from .views import (
     BookDetailView,
     BookFavoriteView,
     BookListView,
+    CartItemCreateView,
+    CartItemDetailView,
+    CartView,
     FavoriteListView,
 )
 
 urlpatterns = [
     path("", BookListView.as_view(), name="book-list"),
+    path("cart/", CartView.as_view(), name="cart"),
+    path("cart/items/", CartItemCreateView.as_view(), name="cart-item-create"),
+    path("cart/items/<int:book_id>/", CartItemDetailView.as_view(), name="cart-item-detail"),
     path("favorites/", FavoriteListView.as_view(), name="favorite-list"),
     path("<int:pk>/", BookDetailView.as_view(), name="book-detail"),
     path(

@@ -78,7 +78,9 @@ const getBookDetails = (book) => ({
 	isbn: book.isbn,
 	language: book.language,
 	pages: book.pages,
+	price: book.price,
 	publishedYear: book.publishedYear ?? book.published_year ?? book.year,
+	stock: book.stock,
 	title: book.title,
 	updatedAt: book.updatedAt ?? book.updated_at,
 });
@@ -276,7 +278,7 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 					</div>
 
 					<div className={styles.purchaseBar}>
-						<div><span>ADD TO READING BAG</span><strong>{cartQuantity ? `${cartQuantity} ${cartQuantity === 1 ? 'copy' : 'copies'} selected` : 'Choose this edition'}</strong></div>
+						<div><span>${details.price} · {details.stock} available</span><strong>{cartQuantity ? `${cartQuantity} ${cartQuantity === 1 ? 'copy' : 'copies'} selected` : 'Choose this edition'}</strong></div>
 						{cartQuantity ? (
 							<div className={styles.purchaseQuantity}>
 								<button type="button" onClick={() => onChangeCartQuantity(details.id, -1)} aria-label={`Decrease ${details.title}`}><IoRemoveOutline /></button>
@@ -284,7 +286,7 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 								<button type="button" onClick={() => onChangeCartQuantity(details.id, 1)} aria-label={`Increase ${details.title}`}><IoAddOutline /></button>
 							</div>
 						) : (
-							<button className={styles.purchaseButton} type="button" onClick={() => onAddToCart(serverBook)}><IoBagAddOutline /> Add to bag</button>
+							<button className={styles.purchaseButton} type="button" onClick={() => onAddToCart(serverBook)} disabled={!details.stock}><IoBagAddOutline /> {details.stock ? 'Add to bag' : 'Sold out'}</button>
 						)}
 					</div>
 				</div>

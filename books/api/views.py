@@ -14,6 +14,7 @@ from .serializers import (
     AddCartItemSerializer,
     BookSerializer,
     CartSerializer,
+    CartSyncSerializer,
     UpdateCartItemSerializer,
 )
 
@@ -173,7 +174,6 @@ class CartItemDetailView(APIView):
         item.save(update_fields=["quantity", "updated_at"])
         item.cart.save(update_fields=["updated_at"])
         return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
-
     @transaction.atomic
     def delete(self, request, book_id):
         cart, _ = Cart.objects.get_or_create(user=request.user)
@@ -184,3 +184,56 @@ class CartItemDetailView(APIView):
         ).delete()
         cart.save(update_fields=["updated_at"])
         return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+class CartSyncView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = CartSyncSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        requested_items = serializer.validated_data["items"]
+        book_ids = [item["book_id"] for item in requested_items]
+        books = {
+            book.pk: book
+            for book in Book.objects.select_for_update().filter(pk__in=book_ids)
+        }
+
+        if len(books) != len(book_ids):
+            missing_ids = sorted(set(book_ids) - set(books))
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError({"book_id": f"Unknown books: {missing_ids}"})
+
+        for item_data in requested_items:
+            validate_stock(
+                books[item_data["book_id"]],
+                item_data["quantity"],
+            )
+
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        existing_items = {
+            item.book_id: item
+            for item in CartItem.objects.select_for_update().filter(
+                cart=cart,
+                book_id__in=book_ids,
+            )
+        }
+
+        for item_data in requested_items:
+            book_id = item_data["book_id"]
+            item = existing_items.get(book_id)
+            if item:
+                item.quantity = max(item.quantity, item_data["quantity"])
+                item.save(update_fields=["quantity", "updated_at"])
+            else:
+                CartItem.objects.create(
+                    cart=cart,
+                    book=books[book_id],
+                    quantity=item_data["quantity"],
+                )
+
+        cart.save(update_fields=["updated_at"])
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+# End of cart API views.

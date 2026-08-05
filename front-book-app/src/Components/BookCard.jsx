@@ -2,7 +2,7 @@ import { AiFillHeart } from "react-icons/ai";
 import { IoAddOutline, IoBagAddOutline, IoRemoveOutline } from 'react-icons/io5';
 import PropTypes from 'prop-types';
 
-import { resolveMediaUrl } from '../services/api';
+import { formatToman, resolveMediaUrl } from '../services/api';
 import styles from './BooksCard.module.css';
 
 function BookCard({ cartQuantity, data, isLiked, handleLikedList, onAddToCart, onChangeCartQuantity, onOpenBook }) {
@@ -48,7 +48,7 @@ function BookCard({ cartQuantity, data, isLiked, handleLikedList, onAddToCart, o
 				<div>
 					<span>{language}</span>
 					<span>{pages}</span>
-					<span>${price}</span>
+					<span>{formatToman(price)}</span>
 				</div>
 			</div>
 			<div className={styles.actions}>

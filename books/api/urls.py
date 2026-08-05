@@ -8,6 +8,7 @@ from .views import (
     BookListView,
     CartItemCreateView,
     CartItemDetailView,
+    CartSyncView,
     CartView,
     FavoriteListView,
 )
@@ -17,6 +18,7 @@ urlpatterns = [
     path("cart/", CartView.as_view(), name="cart"),
     path("cart/items/", CartItemCreateView.as_view(), name="cart-item-create"),
     path("cart/items/<int:book_id>/", CartItemDetailView.as_view(), name="cart-item-detail"),
+    path("cart/sync/", CartSyncView.as_view(), name="cart-sync"),
     path("favorites/", FavoriteListView.as_view(), name="favorite-list"),
     path("<int:pk>/", BookDetailView.as_view(), name="book-detail"),
     path(

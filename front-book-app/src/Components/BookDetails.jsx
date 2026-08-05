@@ -16,7 +16,7 @@ import {
 	IoTimeOutline,
 } from 'react-icons/io5';
 
-import { apiRequest, getArrayPayload, getSinglePayload, resolveMediaUrl } from '../services/api';
+import { apiRequest, formatToman, getArrayPayload, getSinglePayload, resolveMediaUrl } from '../services/api';
 import styles from './BookDetails.module.css';
 
 const formatDate = (date) => {
@@ -278,7 +278,7 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 					</div>
 
 					<div className={styles.purchaseBar}>
-						<div><span>${details.price} · {details.stock} available</span><strong>{cartQuantity ? `${cartQuantity} ${cartQuantity === 1 ? 'copy' : 'copies'} selected` : 'Choose this edition'}</strong></div>
+						<div><span>{formatToman(details.price)} · {details.stock} available</span><strong>{cartQuantity ? `${cartQuantity} ${cartQuantity === 1 ? 'copy' : 'copies'} selected` : 'Choose this edition'}</strong></div>
 						{cartQuantity ? (
 							<div className={styles.purchaseQuantity}>
 								<button type="button" onClick={() => onChangeCartQuantity(details.id, -1)} aria-label={`Decrease ${details.title}`}><IoRemoveOutline /></button>

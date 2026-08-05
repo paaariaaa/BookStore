@@ -175,3 +175,27 @@ class CartApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["items"], [])
+
+    def test_guest_cart_sync_is_idempotent_and_preserves_larger_quantity(self):
+        self.authenticate()
+        self.client.post(
+            "/api/books/cart/items/",
+            {"book_id": self.book.pk, "quantity": 2},
+            format="json",
+        )
+
+        first_sync = self.client.post(
+            "/api/books/cart/sync/",
+            {"items": [{"book_id": self.book.pk, "quantity": 1}]},
+            format="json",
+        )
+        repeated_sync = self.client.post(
+            "/api/books/cart/sync/",
+            {"items": [{"book_id": self.book.pk, "quantity": 1}]},
+            format="json",
+        )
+
+        self.assertEqual(first_sync.status_code, 200)
+        self.assertEqual(repeated_sync.status_code, 200)
+        self.assertEqual(repeated_sync.data["total_items"], 2)
+        self.assertEqual(CartItem.objects.get().quantity, 2)

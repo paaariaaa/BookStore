@@ -205,3 +205,5 @@ export const resolveMediaUrl = (path) => {
 
 	return apiUrl(mediaPath);
 };
+
+export const formatToman = (value) => `${new Intl.NumberFormat('en-US').format(Number(value || 0))} T`;

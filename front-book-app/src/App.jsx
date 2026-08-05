@@ -44,25 +44,19 @@ const createUserProfile = (payload, fallback = {}) => {
 };
 
 const getFavoriteStatus = (book = {}) => book.isFavorite ?? book.is_favorite;
-const CART_STORAGE_KEY = 'book-app-shopping-cart';
-
-const getInitialCart = () => {
-  if (typeof window === 'undefined') return [];
-
-  try {
-    const cart = JSON.parse(window.localStorage.getItem(CART_STORAGE_KEY));
-    return Array.isArray(cart) ? cart.filter((item) => item?.id && item?.quantity > 0) : [];
-  } catch {
-    window.localStorage.removeItem(CART_STORAGE_KEY);
-    return [];
-  }
-};
+const normalizeCart = (payload = {}) => (payload.items || []).map((item) => ({
+  ...item.book,
+  lineTotal: String(item.line_total ?? '0.00'),
+  quantity: item.quantity,
+}));
 
 function App() {
   const [route, setRoute] = useState(getCurrentPath);
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [favoriteOverrides, setFavoriteOverrides] = useState({});
-  const [cart, setCart] = useState(getInitialCart);
+  const [cart, setCart] = useState([]);
+  const [cartSubtotal, setCartSubtotal] = useState('0.00');
+  const [cartError, setCartError] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const isAuthRoute = route === '/login' || route === '/register';
@@ -71,9 +65,33 @@ function App() {
   const bookId = isBookDetailsRoute ? route.replace('/books/', '') : '';
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
 
+  const applyCartResponse = useCallback((payload) => {
+    setCart(normalizeCart(payload));
+    setCartSubtotal(String(payload?.subtotal ?? '0.00'));
+    setCartError('');
+  }, []);
+
   useEffect(() => {
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-  }, [cart]);
+    let isActive = true;
+
+    if (!currentUser) {
+      setCart([]);
+      setCartSubtotal('0.00');
+      return undefined;
+    }
+
+    apiRequest('/api/books/cart/')
+      .then((payload) => {
+        if (isActive) applyCartResponse(payload);
+      })
+      .catch((error) => {
+        if (isActive) setCartError(error.message);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [applyCartResponse, currentUser]);
 
   useEffect(() => {
     const token = getStoredAuthToken();
@@ -107,6 +125,7 @@ function App() {
     const sessionExpiredHandler = () => {
       setCurrentUser(null);
       setFavoriteOverrides({});
+      setCart([]);
       navigate('/login');
     }
 
@@ -127,38 +146,59 @@ function App() {
     setRoute(nextPath);
   }
 
-  const addToCart = (book = {}) => {
+  const addToCart = async (book = {}) => {
     if (!book.id) return;
 
-    setCart((currentCart) => {
-      const existingItem = currentCart.find((item) => String(item.id) === String(book.id));
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
 
-      if (existingItem) {
-        return currentCart.map((item) => String(item.id) === String(book.id)
-          ? { ...item, quantity: item.quantity + 1 }
-          : item);
-      }
-
-      return [...currentCart, {
-        author: book.author || '',
-        id: book.id,
-        image: book.image || '',
-        quantity: 1,
-        title: book.title || 'Untitled book',
-      }];
-    });
+    try {
+      const payload = await apiRequest('/api/books/cart/items/', {
+        body: { book_id: book.id, quantity: 1 },
+        method: 'POST',
+      });
+      applyCartResponse(payload);
+    } catch (error) {
+      setCartError(error.message);
+    }
   };
 
-  const changeCartQuantity = (bookIdToChange, amount) => {
-    setCart((currentCart) => currentCart
-      .map((item) => String(item.id) === String(bookIdToChange)
-        ? { ...item, quantity: item.quantity + amount }
-        : item)
-      .filter((item) => item.quantity > 0));
+  const changeCartQuantity = async (bookIdToChange, amount) => {
+    const item = cart.find((entry) => String(entry.id) === String(bookIdToChange));
+    if (!item) return;
+    const nextQuantity = item.quantity + amount;
+
+    try {
+      const payload = await apiRequest(`/api/books/cart/items/${bookIdToChange}/`, {
+        body: nextQuantity > 0 ? { quantity: nextQuantity } : undefined,
+        method: nextQuantity > 0 ? 'PATCH' : 'DELETE',
+      });
+      applyCartResponse(payload);
+    } catch (error) {
+      setCartError(error.message);
+    }
   };
 
-  const removeFromCart = (bookIdToRemove) => {
-    setCart((currentCart) => currentCart.filter((item) => String(item.id) !== String(bookIdToRemove)));
+  const removeFromCart = async (bookIdToRemove) => {
+    try {
+      const payload = await apiRequest(`/api/books/cart/items/${bookIdToRemove}/`, {
+        method: 'DELETE',
+      });
+      applyCartResponse(payload);
+    } catch (error) {
+      setCartError(error.message);
+    }
+  };
+
+  const clearCart = async () => {
+    try {
+      const payload = await apiRequest('/api/books/cart/', { method: 'DELETE' });
+      applyCartResponse(payload);
+    } catch (error) {
+      setCartError(error.message);
+    }
   };
 
   const getCartQuantity = (bookIdToFind) => cart.find((item) => String(item.id) === String(bookIdToFind))?.quantity || 0;
@@ -254,6 +294,8 @@ function App() {
       clearAuthToken();
       setCurrentUser(null);
       setFavoriteOverrides({});
+      setCart([]);
+      setCartSubtotal('0.00');
       navigate('/');
     }
   }
@@ -275,6 +317,9 @@ function App() {
         onClose={closeCart}
         onOpenBook={(book) => navigate(`/books/${book.id}`)}
         onRemove={removeFromCart}
+        onClear={clearCart}
+        error={cartError}
+        subtotal={cartSubtotal}
       />
       {isAuthRoute ? (
         <AuthBook

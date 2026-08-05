@@ -1,0 +1,208 @@
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 18px;
+	background-color: #303030;
+	padding: 10px 20px;
+	margin-bottom: 80px;
+	border-radius: 10px;
+}
+
+.brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+	padding: 0;
+	background: none;
+	border: none;
+	color: #e0e0e0;
+	cursor: pointer;
+}
+
+.brand svg {
+	flex: 0 0 auto;
+	color: #6552f4;
+	font-size: 2rem;
+}
+
+.brand span {
+	display: grid;
+	gap: 1px;
+	text-align: left;
+}
+
+.brand strong {
+	font-size: 1.5rem;
+	line-height: 1;
+}
+
+.brand small {
+	color: #959595;
+	font-size: 0.78rem;
+	font-weight: 700;
+}
+
+.headerTools {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.accountCard {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 50px;
+	max-width: 100%;
+	padding: 6px;
+	overflow: hidden;
+	background:
+		linear-gradient(135deg, rgba(101, 82, 244, 0.16), rgba(47, 184, 166, 0.08)),
+		#262626;
+	border: 1px solid rgba(224, 224, 224, 0.08);
+	border-radius: 8px;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.accountCard::before {
+	content: '';
+	position: absolute;
+	top: 8px;
+	bottom: 8px;
+	left: 45px;
+	width: 1px;
+	background-color: rgba(224, 224, 224, 0.09);
+}
+
+.userAvatar,
+.guestAvatar {
+	position: relative;
+	z-index: 1;
+	width: 38px;
+	height: 38px;
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: linear-gradient(135deg, #6552f4, #2fb8a6);
+	border-radius: 7px;
+	color: #ffffff;
+	font-size: 0.86rem;
+	font-weight: 900;
+}
+
+.guestAvatar {
+	background: #303030;
+	color: #6552f4;
+}
+
+.guestAvatar svg {
+	font-size: 1.6rem;
+}
+
+.accountText {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	gap: 1px;
+	min-width: 116px;
+	max-width: 170px;
+}
+
+.accountText strong,
+.accountText span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.accountText strong {
+	color: #e0e0e0;
+	font-size: 0.9rem;
+	line-height: 1.1;
+}
+
+.accountText span {
+	color: #959595;
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
+.loginButton,
+.joinButton,
+.logoutButton {
+	position: relative;
+	z-index: 1;
+	height: 38px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	padding: 0 12px;
+	border: none;
+	border-radius: 7px;
+	font-size: 0.86rem;
+	font-weight: 900;
+	cursor: pointer;
+	transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.loginButton {
+	background: linear-gradient(135deg, #6552f4, #2fb8a6);
+	color: #ffffff;
+	box-shadow: 0 12px 20px rgba(101, 82, 244, 0.18);
+}
+
+.joinButton,
+.logoutButton {
+	background-color: rgba(224, 224, 224, 0.08);
+	color: #e0e0e0;
+}
+
+.loginButton:hover,
+.joinButton:hover,
+.logoutButton:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 12px 20px rgba(0, 0, 0, 0.18);
+}
+
+.footer {
+	text-align: center;
+	background-color: #303030;
+	padding: 20px;
+	margin-top: 80px;
+	border-radius: 10px;
+}
+
+@media (max-width: 760px) {
+	.header {
+		align-items: stretch;
+		flex-direction: column;
+		margin-bottom: 42px;
+	}
+
+	.headerTools,
+	.accountCard {
+		width: 100%;
+	}
+
+	.accountCard {
+		flex-wrap: wrap;
+	}
+
+	.accountText {
+		flex: 1;
+	}
+}
+
+@media (max-width: 460px) {
+	.loginButton,
+	.joinButton,
+	.logoutButton {
+		flex: 1;
+	}
+}

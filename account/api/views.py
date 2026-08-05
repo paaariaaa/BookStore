@@ -3,9 +3,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from drf_spectacular.utils import extend_schema
 
 from .serializers import (
+    AuthResponseSerializer,
     LoginSerializer,
     LogoutSerializer,
     RegisterSerializer,
@@ -16,6 +19,12 @@ from .serializers import (
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Register a new user",
+        responses={201: AuthResponseSerializer},
+    )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -37,10 +46,38 @@ class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Log in and obtain JWT tokens",
+        request=LoginSerializer,
+        responses={200: AuthResponseSerializer},
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+
+class RefreshView(TokenRefreshView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Refresh an access token",
+        request=TokenRefreshSerializer,
+        responses={200: TokenRefreshSerializer},
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
 
 class LogoutView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Blacklist a refresh token",
+        request=LogoutSerializer,
+        responses={204: None},
+    )
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -51,6 +88,18 @@ class LogoutView(APIView):
 class ProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["Authentication"], summary="Get the current user profile")
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @extend_schema(tags=["Authentication"], summary="Update the current user profile")
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
+
+    @extend_schema(tags=["Authentication"], summary="Replace the current user profile")
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)
 
     def get_object(self):
         return self.request.user

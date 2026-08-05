@@ -18,6 +18,12 @@ class UserSerializer(serializers.ModelSerializer):
         ]
 
 
+class AuthResponseSerializer(serializers.Serializer):
+    user = UserSerializer(read_only=True)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,

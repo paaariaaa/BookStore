@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 from books.models import Book, Cart, CartItem
 
@@ -8,7 +10,7 @@ class BookSerializer(serializers.ModelSerializer):
         model = Book
         fields = "__all__"
 
-    def get_is_favorite(self, obj):
+    def get_is_favorite(self, obj) -> bool:
         if hasattr(obj, "_is_favorite"):
             return obj._is_favorite
 
@@ -20,6 +22,11 @@ class BookSerializer(serializers.ModelSerializer):
         return False
 
 
+class FavoriteResponseSerializer(serializers.Serializer):
+    book_id = serializers.IntegerField(read_only=True)
+    is_favorite = serializers.BooleanField(read_only=True)
+
+
 class CartItemSerializer(serializers.ModelSerializer):
     book = BookSerializer(read_only=True)
     line_total = serializers.SerializerMethodField()
@@ -28,7 +35,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         model = CartItem
         fields = ["book", "quantity", "line_total"]
 
-    def get_line_total(self, obj):
+    def get_line_total(self, obj) -> Decimal:
         return obj.book.price * obj.quantity
 
 
@@ -41,10 +48,10 @@ class CartSerializer(serializers.ModelSerializer):
         model = Cart
         fields = ["id", "items", "total_items", "subtotal", "updated_at"]
 
-    def get_total_items(self, obj):
+    def get_total_items(self, obj) -> int:
         return sum(item.quantity for item in obj.items.all())
 
-    def get_subtotal(self, obj):
+    def get_subtotal(self, obj) -> Decimal:
         return sum(item.book.price * item.quantity for item in obj.items.all())
 
 

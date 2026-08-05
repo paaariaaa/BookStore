@@ -54,14 +54,63 @@
 	color: #959595;
 }
 
-.card button {
-	height: fit-content;
-	background: none;
-	border: none;
-	cursor: pointer;
-	transition: transform 0.1s ease-in-out;
+.actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: 12px;
 }
 
-.card button:hover {
-	transform: scale(1.2);
+.actions button {
+	height: fit-content;
+	border: none;
+	cursor: pointer;
+	transition: transform 0.15s ease-in-out, background .2s ease;
+}
+
+.actions button:hover { transform: translateY(-1px); }
+
+.favoriteButton {
+	width: 36px;
+	height: 36px !important;
+	display: grid;
+	place-items: center;
+	background: rgba(255,255,255,.05);
+	border-radius: 10px;
+}
+
+.addButton {
+	height: 38px !important;
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 0 13px;
+	background: linear-gradient(135deg,#24594b,#2fb8a6);
+	border-radius: 10px;
+	color: white;
+	font-size: .73rem;
+	font-weight: 900;
+	box-shadow: 0 8px 16px rgba(47,184,166,.16);
+}
+
+.addButton svg { font-size: 1rem; }
+
+.quantity {
+	display: grid;
+	grid-template-columns: 30px 30px 30px;
+	align-items: center;
+	overflow: hidden;
+	background: #242b28;
+	border: 1px solid rgba(47,184,166,.28);
+	border-radius: 10px;
+}
+
+.quantity button { width: 30px; height: 36px; display: grid; place-items: center; background: transparent; color: #62cfbd; }
+.quantity button:hover { background: #24594b; color: white; }
+.quantity b { color: white; font-size: .75rem; text-align: center; }
+
+@media (max-width: 580px) {
+	.card { align-items: center; flex-wrap: wrap; }
+	.info { min-width: calc(100% - 100px); min-height: 88px; }
+	.actions { width: 100%; justify-content: flex-end; margin: 10px 0 0; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.06); }
 }

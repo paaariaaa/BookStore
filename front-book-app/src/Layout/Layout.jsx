@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import {
 	IoBookOutline,
+	IoBagHandleOutline,
 	IoLibraryOutline,
 	IoLogInOutline,
 	IoLogOutOutline,
@@ -20,7 +21,7 @@ const getInitials = (name = '') => {
 	return initials || 'B';
 }
 
-function Layout({ children, currentUser, onHomeClick, onLoginClick, onLogout, onRegisterClick }) {
+function Layout({ cartCount, children, currentUser, onCartClick, onHomeClick, onLoginClick, onLogout, onRegisterClick }) {
 	return (
 		<>
 			<header className={styles.header}>
@@ -33,6 +34,11 @@ function Layout({ children, currentUser, onHomeClick, onLoginClick, onLogout, on
 				</button>
 
 				<div className={styles.headerTools}>
+					<button className={styles.cartButton} type="button" onClick={onCartClick} aria-label={`Open shopping bag with ${cartCount} items`}>
+						<IoBagHandleOutline />
+						<span>Bag</span>
+						<b className={cartCount ? styles.cartCountActive : ''}>{cartCount}</b>
+					</button>
 					{currentUser ? (
 						<div className={styles.accountCard}>
 							<div className={styles.userAvatar}>{getInitials(currentUser.displayName)}</div>
@@ -73,12 +79,14 @@ function Layout({ children, currentUser, onHomeClick, onLoginClick, onLogout, on
 }
 
 Layout.propTypes = {
+	cartCount: PropTypes.number.isRequired,
 	children: PropTypes.node.isRequired,
 	currentUser: PropTypes.shape({
 		displayName: PropTypes.string.isRequired,
 		username: PropTypes.string.isRequired,
 	}),
 	onHomeClick: PropTypes.func.isRequired,
+	onCartClick: PropTypes.func.isRequired,
 	onLoginClick: PropTypes.func.isRequired,
 	onLogout: PropTypes.func.isRequired,
 	onRegisterClick: PropTypes.func.isRequired,

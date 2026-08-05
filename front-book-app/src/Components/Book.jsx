@@ -8,7 +8,7 @@ import SideCard from './SideCard';
 
 const getFavoriteStatus = (book) => book.isFavorite ?? book.is_favorite;
 
-function Book({ isBookFavorite = getFavoriteStatus, onOpenBook, onToggleFavorite }) {
+function Book({ getCartQuantity, isBookFavorite = getFavoriteStatus, onAddToCart, onChangeCartQuantity, onOpenBook, onToggleFavorite }) {
 	const [sourceBooks, setSourceBooks] = useState([]);
 	const [books, setBooks] = useState([]);
 	const [search, setSearch] = useState('');
@@ -82,7 +82,10 @@ function Book({ isBookFavorite = getFavoriteStatus, onOpenBook, onToggleFavorite
 							key={book.id}
 							data={book}
 							isLiked={isBookFavorite(book)}
+							cartQuantity={getCartQuantity(book.id)}
 							handleLikedList={onToggleFavorite}
+							onAddToCart={onAddToCart}
+							onChangeCartQuantity={onChangeCartQuantity}
 							onOpenBook={onOpenBook}
 						/>
 					))}
@@ -98,7 +101,10 @@ function Book({ isBookFavorite = getFavoriteStatus, onOpenBook, onToggleFavorite
 }
 
 Book.propTypes = {
+	getCartQuantity: PropTypes.func.isRequired,
 	isBookFavorite: PropTypes.func,
+	onAddToCart: PropTypes.func.isRequired,
+	onChangeCartQuantity: PropTypes.func.isRequired,
 	onOpenBook: PropTypes.func.isRequired,
 	onToggleFavorite: PropTypes.func.isRequired,
 };

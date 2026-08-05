@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
 	IoArrowBackOutline,
+	IoAddOutline,
+	IoBagAddOutline,
 	IoBarcodeOutline,
 	IoBookOutline,
 	IoCalendarOutline,
@@ -10,6 +12,7 @@ import {
 	IoHourglassOutline,
 	IoLanguageOutline,
 	IoLayersOutline,
+	IoRemoveOutline,
 	IoTimeOutline,
 } from 'react-icons/io5';
 
@@ -82,7 +85,7 @@ const getBookDetails = (book) => ({
 
 const getFavoriteStatus = (book = {}) => book.isFavorite ?? book.is_favorite;
 
-function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack, onOpenBook, onToggleFavorite }) {
+function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteStatus, onAddToCart, onBack, onChangeCartQuantity, onOpenBook, onToggleFavorite }) {
 	const [serverBook, setServerBook] = useState(book);
 	const [catalogBooks, setCatalogBooks] = useState([]);
 	const [catalogLoading, setCatalogLoading] = useState(false);
@@ -271,6 +274,19 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 							</div>
 						))}
 					</div>
+
+					<div className={styles.purchaseBar}>
+						<div><span>ADD TO READING BAG</span><strong>{cartQuantity ? `${cartQuantity} ${cartQuantity === 1 ? 'copy' : 'copies'} selected` : 'Choose this edition'}</strong></div>
+						{cartQuantity ? (
+							<div className={styles.purchaseQuantity}>
+								<button type="button" onClick={() => onChangeCartQuantity(details.id, -1)} aria-label={`Decrease ${details.title}`}><IoRemoveOutline /></button>
+								<b>{cartQuantity}</b>
+								<button type="button" onClick={() => onChangeCartQuantity(details.id, 1)} aria-label={`Increase ${details.title}`}><IoAddOutline /></button>
+							</div>
+						) : (
+							<button className={styles.purchaseButton} type="button" onClick={() => onAddToCart(serverBook)}><IoBagAddOutline /> Add to bag</button>
+						)}
+					</div>
 				</div>
 			</section>
 
@@ -341,8 +357,11 @@ function BookDetails({ book, bookId, isBookFavorite = getFavoriteStatus, onBack,
 BookDetails.propTypes = {
 	book: PropTypes.object,
 	bookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+	cartQuantity: PropTypes.number.isRequired,
 	isBookFavorite: PropTypes.func,
+	onAddToCart: PropTypes.func.isRequired,
 	onBack: PropTypes.func.isRequired,
+	onChangeCartQuantity: PropTypes.func.isRequired,
 	onOpenBook: PropTypes.func.isRequired,
 	onToggleFavorite: PropTypes.func.isRequired,
 };

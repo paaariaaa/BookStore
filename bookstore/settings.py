@@ -14,25 +14,46 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def get_env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def get_env_list(name):
+    return [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9uu73imd=@uv@r%d=y-dfj8y0d0j=23%=fc_%gx!)ib^#7h^hg'
+DEBUG = get_env_bool("DJANGO_DEBUG", True)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false."
+        )
+    SECRET_KEY = "django-insecure-local-development-key"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = get_env_list("DJANGO_ALLOWED_HOSTS")
+if not ALLOWED_HOSTS:
+    if DEBUG:
+        ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+    else:
+        raise ImproperlyConfigured(
+            "DJANGO_ALLOWED_HOSTS must be set when DJANGO_DEBUG is false."
+        )
 
 
 # Application definition
@@ -94,11 +115,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    origin.strip().rstrip("/")
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-    if origin.strip()
-]
+CORS_ALLOWED_ORIGINS = [origin.rstrip("/") for origin in get_env_list("CORS_ALLOWED_ORIGINS")]
 CORS_ALLOWED_ORIGIN_REGEXES = (
     [
         r"^https?://localhost:\d+$",
@@ -110,6 +127,23 @@ CORS_ALLOWED_ORIGIN_REGEXES = (
 CORS_ALLOW_CREDENTIALS = True
 CORS_URLS_REGEX = r"^/(?:api|media)/.*$"
 CORS_PREFLIGHT_MAX_AGE = 86400
+
+SECURE_SSL_REDIRECT = get_env_bool("SECURE_SSL_REDIRECT", not DEBUG)
+SESSION_COOKIE_SECURE = get_env_bool("SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = get_env_bool("CSRF_COOKIE_SECURE", not DEBUG)
+SECURE_HSTS_SECONDS = int(
+    os.getenv("SECURE_HSTS_SECONDS", "31536000" if not DEBUG else "0")
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = get_env_bool(
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    not DEBUG,
+)
+SECURE_HSTS_PRELOAD = get_env_bool("SECURE_HSTS_PRELOAD", not DEBUG)
+SECURE_PROXY_SSL_HEADER = (
+    ("HTTP_X_FORWARDED_PROTO", "https")
+    if get_env_bool("USE_X_FORWARDED_PROTO", not DEBUG)
+    else None
+)
 
 ROOT_URLCONF = 'bookstore.urls'
 

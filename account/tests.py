@@ -85,6 +85,115 @@ class AuthenticationTokenFlowTests(TestCase):
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    def test_authenticated_user_can_update_profile_fields_only(self):
+        user = User.objects.create_user(
+            username="profile-user",
+            password=self.password,
+            is_staff=False,
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.patch(
+            "/api/auth/profile/",
+            {
+                "username": "updated-profile-user",
+                "email": "updated@example.com",
+                "first_name": "Updated",
+                "last_name": "User",
+                "is_staff": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["username"], "updated-profile-user")
+        self.assertEqual(response.data["email"], "updated@example.com")
+        self.assertFalse(response.data["is_staff"])
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, "Updated")
+        self.assertEqual(user.last_name, "User")
+        self.assertFalse(user.is_staff)
+
+    def test_authenticated_user_can_change_password_and_old_refresh_is_revoked(self):
+        user = User.objects.create_user(
+            username="password-user",
+            password=self.password,
+        )
+        login_response = self.client.post(
+            "/api/auth/login/",
+            {"username": user.username, "password": self.password},
+            format="json",
+        )
+        access = login_response.data["access"]
+        refresh = login_response.data["refresh"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+
+        response = self.client.post(
+            "/api/auth/profile/password/",
+            {
+                "current_password": self.password,
+                "new_password": "new-strong-password-456",
+                "new_password_confirm": "new-strong-password-456",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("new-strong-password-456"))
+
+        old_password_login = self.client.post(
+            "/api/auth/login/",
+            {"username": user.username, "password": self.password},
+            format="json",
+        )
+        self.assertEqual(old_password_login.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        new_password_login = self.client.post(
+            "/api/auth/login/",
+            {"username": user.username, "password": "new-strong-password-456"},
+            format="json",
+        )
+        self.assertEqual(new_password_login.status_code, status.HTTP_200_OK)
+
+        revoked_refresh = self.client.post(
+            "/api/auth/refresh/",
+            {"refresh": refresh},
+            format="json",
+        )
+        self.assertEqual(revoked_refresh.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_password_change_rejects_wrong_current_password_and_mismatch(self):
+        user = User.objects.create_user(
+            username="password-validation-user",
+            password=self.password,
+        )
+        self.client.force_authenticate(user=user)
+
+        wrong_current = self.client.post(
+            "/api/auth/profile/password/",
+            {
+                "current_password": "wrong-password",
+                "new_password": "new-strong-password-456",
+                "new_password_confirm": "new-strong-password-456",
+            },
+            format="json",
+        )
+        self.assertEqual(wrong_current.status_code, status.HTTP_400_BAD_REQUEST)
+
+        mismatch = self.client.post(
+            "/api/auth/profile/password/",
+            {
+                "current_password": self.password,
+                "new_password": "new-strong-password-456",
+                "new_password_confirm": "different-password-789",
+            },
+            format="json",
+        )
+        self.assertEqual(mismatch.status_code, status.HTTP_400_BAD_REQUEST)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password(self.password))
+
 
 class UserManagementApiTests(TestCase):
     def setUp(self):

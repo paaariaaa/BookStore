@@ -14,12 +14,13 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 
-from books.models import Book, Cart, CartItem, Favorite, Order, OrderItem
+from books.models import Book, BookReview, Cart, CartItem, Favorite, Order, OrderItem
 
-from .permissions import IsAdminOrReadOnly
+from .permissions import IsAdminOrReadOnly, IsReviewOwnerOrStaff
 from .serializers import (
     AddCartItemSerializer,
     BookSerializer,
+    BookReviewSerializer,
     CartSerializer,
     CartSyncSerializer,
     FavoriteResponseSerializer,
@@ -65,6 +66,60 @@ class BookDetailView(RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return with_favorite_status(Book.objects.all(), self.request.user)
+
+
+@extend_schema_view(
+    get=extend_schema(tags=["Reviews"], summary="List reviews for a book"),
+    post=extend_schema(
+        tags=["Reviews"],
+        summary="Create a review for a book",
+        request=BookReviewSerializer,
+        responses={201: BookReviewSerializer},
+    ),
+)
+class BookReviewListCreateView(ListCreateAPIView):
+    serializer_class = BookReviewSerializer
+    permission_classes = [IsReviewOwnerOrStaff]
+
+    def get_queryset(self):
+        get_object_or_404(Book, pk=self.kwargs["book_id"])
+        return BookReview.objects.filter(
+            book_id=self.kwargs["book_id"],
+        ).select_related("user", "book")
+
+    def perform_create(self, serializer):
+        book = get_object_or_404(Book, pk=self.kwargs["book_id"])
+        serializer.save(book=book, user=self.request.user)
+
+
+@extend_schema_view(
+    get=extend_schema(tags=["Reviews"], summary="Retrieve a book review"),
+    patch=extend_schema(
+        tags=["Reviews"],
+        summary="Update your book review",
+        request=BookReviewSerializer,
+        responses=BookReviewSerializer,
+    ),
+    put=extend_schema(
+        tags=["Reviews"],
+        summary="Replace your book review",
+        request=BookReviewSerializer,
+        responses=BookReviewSerializer,
+    ),
+    delete=extend_schema(
+        tags=["Reviews"],
+        summary="Delete a book review",
+        responses={204: None},
+    ),
+)
+class BookReviewDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = BookReviewSerializer
+    permission_classes = [IsReviewOwnerOrStaff]
+
+    def get_queryset(self):
+        return BookReview.objects.filter(
+            book_id=self.kwargs["book_id"],
+        ).select_related("user", "book")
 
 
 @extend_schema_view(

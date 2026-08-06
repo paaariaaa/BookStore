@@ -428,9 +428,11 @@ function App() {
         <BookDetails
           book={null}
           bookId={bookId}
+          currentUser={currentUser}
           isBookFavorite={isBookFavorite}
           onBack={() => navigate('/')}
           onOpenBook={(book) => navigate(`/books/${book.id}`)}
+          onLoginClick={() => navigate('/login')}
           onToggleFavorite={toggleFavorite}
           cartQuantity={getCartQuantity(bookId)}
           onAddToCart={addToCart}

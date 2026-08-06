@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from books.models import Book, CartItem, Favorite, Order
+from books.models import Book, BookReview, CartItem, Favorite, Order
 
 
 class BookAdminApiTests(TestCase):
@@ -74,6 +74,119 @@ class BookAdminApiTests(TestCase):
         deleted = self.client.delete(book_url)
         self.assertEqual(deleted.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Book.objects.filter(pk=created.data["id"]).exists())
+
+
+class BookReviewApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="reviewer",
+            password="password-123",
+        )
+        self.other_user = User.objects.create_user(
+            username="other-reviewer",
+            password="password-123",
+        )
+        self.admin = User.objects.create_user(
+            username="review-admin",
+            password="password-123",
+            is_staff=True,
+        )
+        self.book = Book.objects.create(
+            title="Review Book",
+            author="Review Author",
+        )
+
+    def authenticate(self, user):
+        access = RefreshToken.for_user(user).access_token
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+
+    def review_url(self):
+        return f"/api/books/{self.book.pk}/reviews/"
+
+    def test_reviews_are_public_but_creation_requires_authentication(self):
+        self.assertEqual(
+            self.client.get(self.review_url()).status_code,
+            status.HTTP_200_OK,
+        )
+        response = self.client.post(
+            self.review_url(),
+            {"rating": 5, "comment": "Excellent book."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_user_can_create_only_one_review_per_book(self):
+        self.authenticate(self.user)
+        response = self.client.post(
+            self.review_url(),
+            {"rating": 5, "comment": "Excellent book."},
+            format="json",
+        )
+        duplicate = self.client.post(
+            self.review_url(),
+            {"rating": 4, "comment": "Updated opinion."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["is_owner"])
+        self.assertTrue(response.data["can_edit"])
+        self.assertTrue(response.data["can_delete"])
+        self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(BookReview.objects.count(), 1)
+
+    def test_owner_can_update_and_delete_review(self):
+        self.authenticate(self.user)
+        created = self.client.post(
+            self.review_url(),
+            {"rating": 3, "comment": "It was okay."},
+            format="json",
+        )
+        review_url = f"{self.review_url()}{created.data['id']}/"
+
+        updated = self.client.patch(
+            review_url,
+            {"rating": 4, "comment": "It got better on a second read."},
+            format="json",
+        )
+        deleted = self.client.delete(review_url)
+
+        self.assertEqual(updated.status_code, status.HTTP_200_OK)
+        self.assertEqual(updated.data["rating"], 4)
+        self.assertEqual(deleted.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(BookReview.objects.exists())
+
+    def test_only_owner_can_edit_but_staff_can_delete_any_review(self):
+        self.authenticate(self.user)
+        created = self.client.post(
+            self.review_url(),
+            {"rating": 2, "comment": "Not for me."},
+            format="json",
+        )
+        review_url = f"{self.review_url()}{created.data['id']}/"
+
+        self.authenticate(self.other_user)
+        self.assertEqual(
+            self.client.patch(
+                review_url,
+                {"comment": "Tampered."},
+                format="json",
+            ).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.delete(review_url).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+        self.authenticate(self.admin)
+        listing = self.client.get(self.review_url())
+        deleted = self.client.delete(review_url)
+
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+        self.assertTrue(listing.data[0]["can_delete"])
+        self.assertEqual(deleted.status_code, status.HTTP_204_NO_CONTENT)
 
 
 class FavoriteApiTests(TestCase):

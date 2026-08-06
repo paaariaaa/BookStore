@@ -88,7 +88,7 @@ const getBookDetails = (book) => ({
 
 const getFavoriteStatus = (book = {}) => book.isFavorite ?? book.is_favorite;
 
-function BookDetails({ book, bookId, cartQuantity, currentUser, isBookFavorite = getFavoriteStatus, onAddToCart, onBack, onChangeCartQuantity, onLoginClick, onOpenBook, onToggleFavorite }) {
+function BookDetails({ book, bookId, cartQuantity, currentUser, isBookFavorite = getFavoriteStatus, onAddToCart, onBack, onChangeCartQuantity, onLoginClick, onOpenBook, onToggleFavorite, refreshKey }) {
 	const [serverBook, setServerBook] = useState(book);
 	const [catalogBooks, setCatalogBooks] = useState([]);
 	const [catalogLoading, setCatalogLoading] = useState(false);
@@ -124,7 +124,7 @@ function BookDetails({ book, bookId, cartQuantity, currentUser, isBookFavorite =
 		return () => {
 			isActive = false;
 		};
-	}, [book, bookId]);
+	}, [book, bookId, refreshKey]);
 
 	useEffect(() => {
 		let isActive = true;
@@ -149,7 +149,7 @@ function BookDetails({ book, bookId, cartQuantity, currentUser, isBookFavorite =
 		return () => {
 			isActive = false;
 		};
-	}, []);
+	}, [refreshKey]);
 
 	if (!serverBook && isLoading) {
 		return (
@@ -287,7 +287,7 @@ function BookDetails({ book, bookId, cartQuantity, currentUser, isBookFavorite =
 								<button type="button" onClick={() => onChangeCartQuantity(details.id, 1)} aria-label={`Increase ${details.title}`}><IoAddOutline /></button>
 							</div>
 						) : (
-							<button className={styles.purchaseButton} type="button" onClick={() => onAddToCart(serverBook)} disabled={!details.stock}><IoBagAddOutline /> {details.stock ? 'Add to bag' : 'Sold out'}</button>
+							<button className={styles.purchaseButton} type="button" onClick={() => onAddToCart(serverBook)} disabled={!details.stock}><IoBagAddOutline /> {details.stock ? 'Add to Cart' : 'Sold out'}</button>
 						)}
 					</div>
 				</div>
@@ -317,6 +317,7 @@ function BookDetails({ book, bookId, cartQuantity, currentUser, isBookFavorite =
 
 			<BookReviews
 				bookId={details.id}
+				bookTitle={details.title}
 				currentUser={currentUser}
 				onLoginClick={onLoginClick}
 			/>
@@ -368,6 +369,8 @@ BookDetails.propTypes = {
 	bookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
 	cartQuantity: PropTypes.number.isRequired,
 	currentUser: PropTypes.shape({
+		displayName: PropTypes.string,
+		is_staff: PropTypes.bool,
 		username: PropTypes.string,
 	}),
 	isBookFavorite: PropTypes.func,
@@ -377,6 +380,7 @@ BookDetails.propTypes = {
 	onLoginClick: PropTypes.func.isRequired,
 	onOpenBook: PropTypes.func.isRequired,
 	onToggleFavorite: PropTypes.func.isRequired,
+	refreshKey: PropTypes.number.isRequired,
 };
 
 export default BookDetails;

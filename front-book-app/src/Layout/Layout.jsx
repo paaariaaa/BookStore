@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import {
 	IoBookOutline,
 	IoBagHandleOutline,
+	IoChevronForwardOutline,
 	IoLibraryOutline,
 	IoLogInOutline,
 	IoLogOutOutline,
@@ -21,7 +22,7 @@ const getInitials = (name = '') => {
 	return initials || 'B';
 }
 
-function Layout({ cartCount, children, currentUser, onCartClick, onHomeClick, onLoginClick, onLogout, onRegisterClick }) {
+function Layout({ cartCount, children, currentUser, isAdminRoute, isProfileOpen, onAdminClick, onCartClick, onHomeClick, onLoginClick, onLogout, onProfileClick, onRegisterClick }) {
 	return (
 		<>
 			<header className={styles.header}>
@@ -34,18 +35,40 @@ function Layout({ cartCount, children, currentUser, onCartClick, onHomeClick, on
 				</button>
 
 				<div className={styles.headerTools}>
-					<button className={styles.cartButton} type="button" onClick={onCartClick} aria-label={`Open shopping bag with ${cartCount} items`}>
+					<button className={styles.cartButton} type="button" onClick={onCartClick} aria-label={`Open shopping cart with ${cartCount} items`}>
 						<IoBagHandleOutline />
-						<span>Bag</span>
+						<span>Cart</span>
 						<b className={cartCount ? styles.cartCountActive : ''}>{cartCount}</b>
 					</button>
+					{currentUser?.is_staff === true && (
+						<button
+							className={`${styles.adminButton} ${isAdminRoute ? styles.adminButtonActive : ''}`}
+							type="button"
+							onClick={onAdminClick}
+							aria-current={isAdminRoute ? 'page' : undefined}
+						>
+							<span className={styles.adminGlyph}><IoBookOutline /></span>
+							<span className={styles.adminCopy}><small>STAFF SPACE</small><strong>Books & members</strong></span>
+							<IoChevronForwardOutline />
+						</button>
+					)}
 					{currentUser ? (
 						<div className={styles.accountCard}>
-							<div className={styles.userAvatar}>{getInitials(currentUser.displayName)}</div>
-							<div className={styles.accountText}>
-								<strong>{currentUser.displayName}</strong>
-								<span>{currentUser.username}</span>
-							</div>
+							<button
+								className={styles.profileTrigger}
+								type="button"
+								onClick={onProfileClick}
+								aria-label={`Open ${currentUser.displayName}'s reader profile`}
+								aria-haspopup="dialog"
+								aria-expanded={isProfileOpen}
+							>
+								<div className={styles.userAvatar}>{getInitials(currentUser.displayName)}</div>
+								<div className={styles.accountText}>
+									<strong>{currentUser.displayName}</strong>
+									<span>{currentUser.username ? `@${currentUser.username}` : 'Reader profile'}</span>
+								</div>
+								<span className={styles.profileArrow}><IoChevronForwardOutline /></span>
+							</button>
 							<button className={styles.logoutButton} type="button" onClick={onLogout}>
 								<IoLogOutOutline />
 								Logout
@@ -83,12 +106,17 @@ Layout.propTypes = {
 	children: PropTypes.node.isRequired,
 	currentUser: PropTypes.shape({
 		displayName: PropTypes.string.isRequired,
+		is_staff: PropTypes.bool,
 		username: PropTypes.string.isRequired,
 	}),
+	isAdminRoute: PropTypes.bool.isRequired,
+	isProfileOpen: PropTypes.bool.isRequired,
+	onAdminClick: PropTypes.func.isRequired,
 	onHomeClick: PropTypes.func.isRequired,
 	onCartClick: PropTypes.func.isRequired,
 	onLoginClick: PropTypes.func.isRequired,
 	onLogout: PropTypes.func.isRequired,
+	onProfileClick: PropTypes.func.isRequired,
 	onRegisterClick: PropTypes.func.isRequired,
 };
 

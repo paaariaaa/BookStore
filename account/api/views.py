@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -9,11 +10,13 @@ from drf_spectacular.utils import extend_schema
 
 from .serializers import (
     AuthResponseSerializer,
+    AdminUserSerializer,
     LoginSerializer,
     LogoutSerializer,
     RegisterSerializer,
     UserSerializer,
 )
+from .permissions import IsStaffForReadSuperuserForWrite
 
 
 class RegisterView(generics.CreateAPIView):
@@ -103,3 +106,29 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+@extend_schema(
+    tags=["User management"],
+    summary="List all users for staff administrators",
+)
+class UserManagementListView(generics.ListAPIView):
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsStaffForReadSuperuserForWrite]
+
+    def get_queryset(self):
+        return User.objects.order_by("-date_joined")
+
+
+@extend_schema(
+    tags=["User management"],
+    summary="View or update a user account",
+    request=AdminUserSerializer,
+    responses=AdminUserSerializer,
+)
+class UserManagementDetailView(generics.RetrieveUpdateAPIView):
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsStaffForReadSuperuserForWrite]
+
+    def get_queryset(self):
+        return User.objects.all()

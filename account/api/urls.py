@@ -1,5 +1,13 @@
 from django.urls import path
-from .views import LoginView, LogoutView, ProfileView, RefreshView, RegisterView
+from .views import (
+    LoginView,
+    LogoutView,
+    ProfileView,
+    RefreshView,
+    RegisterView,
+    UserManagementDetailView,
+    UserManagementListView,
+)
 
 
 urlpatterns = [
@@ -27,5 +35,15 @@ urlpatterns = [
         "profile/",
         ProfileView.as_view(),
         name="profile",
+    ),
+    path(
+        "users/",
+        UserManagementListView.as_view(),
+        name="user-management-list",
+    ),
+    path(
+        "users/<int:pk>/",
+        UserManagementDetailView.as_view(),
+        name="user-management-detail",
     ),
 ]

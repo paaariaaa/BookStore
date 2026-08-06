@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from rest_framework import serializers
-from books.models import Book, Cart, CartItem
+from books.models import Book, Cart, CartItem, Order, OrderItem
 
 class BookSerializer(serializers.ModelSerializer):
     is_favorite = serializers.SerializerMethodField()
@@ -77,3 +77,34 @@ class CartSyncSerializer(serializers.Serializer):
         if len(book_ids) != len(set(book_ids)):
             raise serializers.ValidationError("Each book may appear only once.")
         return items
+
+
+class MockPaymentSerializer(serializers.Serializer):
+    succeed = serializers.BooleanField(default=True)
+
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    line_total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderItem
+        fields = ["book", "title", "unit_price", "quantity", "line_total"]
+
+    def get_line_total(self, obj) -> Decimal:
+        return obj.unit_price * obj.quantity
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "reference",
+            "status",
+            "total_amount",
+            "items",
+            "created_at",
+            "paid_at",
+        ]

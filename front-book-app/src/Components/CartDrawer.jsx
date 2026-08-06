@@ -5,6 +5,7 @@ import {
 	IoBagHandleOutline,
 	IoBookOutline,
 	IoCloseOutline,
+	IoCardOutline,
 	IoRemoveOutline,
 	IoTrashOutline,
 } from 'react-icons/io5';
@@ -12,7 +13,7 @@ import {
 import { formatToman, resolveMediaUrl } from '../services/api';
 import styles from './CartDrawer.module.css';
 
-function CartDrawer({ cart, error, isOpen, onChangeQuantity, onClear, onClose, onOpenBook, onRemove, subtotal }) {
+function CartDrawer({ cart, error, isOpen, isPaying, onChangeQuantity, onCheckout, onClear, onClose, onOpenBook, onRemove, paymentMessage, subtotal }) {
 	const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
 
 	useEffect(() => {
@@ -45,6 +46,7 @@ function CartDrawer({ cart, error, isOpen, onChangeQuantity, onClear, onClose, o
 					<>
 						<div className={styles.items}>
 							{error && <p role="alert">{error}</p>}
+							{paymentMessage && <p className={styles.paymentMessage} role="status">{paymentMessage}</p>}
 							{cart.map((item) => {
 								const cover = resolveMediaUrl(item.image);
 								return (
@@ -71,12 +73,17 @@ function CartDrawer({ cart, error, isOpen, onChangeQuantity, onClear, onClose, o
 							<div><span>Selected editions</span><strong>{cart.length}</strong></div>
 							<div><span>Total books</span><strong>{totalItems}</strong></div>
 							<div><span>Subtotal</span><strong>{formatToman(subtotal)}</strong></div>
+							<button className={styles.payButton} type="button" onClick={onCheckout} disabled={isPaying}>
+								<IoCardOutline /> {isPaying ? 'Processing payment...' : 'Mock payment'}
+							</button>
 							<button type="button" onClick={onClear}>Clear bag</button>
 							<p>Shipping and taxes are calculated during checkout.</p>
 						</footer>
 					</>
 				) : (
 					<div className={styles.empty}>
+						{paymentMessage && <p className={styles.paymentMessage} role="status">{paymentMessage}</p>}
+						{error && <p role="alert">{error}</p>}
 						<div><IoBookOutline /><IoAddOutline /></div>
 						<h3>Your bag is waiting for a story</h3>
 						<p>Add a book from the shelf and it will stay here for your next visit.</p>
@@ -100,11 +107,14 @@ CartDrawer.propTypes = {
 	})).isRequired,
 	error: PropTypes.string.isRequired,
 	isOpen: PropTypes.bool.isRequired,
+	isPaying: PropTypes.bool.isRequired,
 	onChangeQuantity: PropTypes.func.isRequired,
+	onCheckout: PropTypes.func.isRequired,
 	onClear: PropTypes.func.isRequired,
 	onClose: PropTypes.func.isRequired,
 	onOpenBook: PropTypes.func.isRequired,
 	onRemove: PropTypes.func.isRequired,
+	paymentMessage: PropTypes.string.isRequired,
 	subtotal: PropTypes.string.isRequired,
 };
 

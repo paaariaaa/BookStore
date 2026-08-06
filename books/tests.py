@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from books.models import Book, CartItem, Favorite
+from books.models import Book, CartItem, Favorite, Order
 
 
 class BookAdminApiTests(TestCase):
@@ -265,3 +265,57 @@ class CartApiTests(TestCase):
         self.assertEqual(repeated_sync.status_code, 200)
         self.assertEqual(repeated_sync.data["total_items"], 2)
         self.assertEqual(CartItem.objects.get().quantity, 2)
+
+    def test_successful_mock_payment_creates_order_reduces_stock_and_clears_cart(self):
+        self.authenticate()
+        self.client.post(
+            "/api/books/cart/items/",
+            {"book_id": self.book.pk, "quantity": 2},
+            format="json",
+        )
+
+        response = self.client.post(
+            "/api/books/cart/pay/mock/",
+            {"succeed": True},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], Order.Status.PAID)
+        self.assertEqual(str(response.data["total_amount"]), "25.00")
+        self.assertEqual(len(response.data["items"]), 1)
+        self.assertEqual(response.data["items"][0]["quantity"], 2)
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.stock, 1)
+        self.assertFalse(CartItem.objects.filter(cart__user=self.user).exists())
+
+    def test_failed_mock_payment_keeps_stock_and_cart(self):
+        self.authenticate()
+        self.client.post(
+            "/api/books/cart/items/",
+            {"book_id": self.book.pk, "quantity": 1},
+            format="json",
+        )
+
+        response = self.client.post(
+            "/api/books/cart/pay/mock/",
+            {"succeed": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], Order.Status.FAILED)
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.stock, 3)
+        self.assertTrue(CartItem.objects.filter(cart__user=self.user).exists())
+
+    def test_mock_payment_requires_authentication_and_non_empty_cart(self):
+        self.assertEqual(
+            self.client.post("/api/books/cart/pay/mock/", {"succeed": True}).status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+        self.authenticate()
+        self.assertEqual(
+            self.client.post("/api/books/cart/pay/mock/", {"succeed": True}).status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )

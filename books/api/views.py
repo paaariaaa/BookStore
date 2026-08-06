@@ -1,6 +1,7 @@
 from django.db import transaction
-from django.db.models import BooleanField, Exists, OuterRef, Value
+from django.db.models import BooleanField, Exists, F, OuterRef, Value
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import (
     ListAPIView,
@@ -13,7 +14,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 
-from books.models import Book, Cart, CartItem, Favorite
+from books.models import Book, Cart, CartItem, Favorite, Order, OrderItem
 
 from .permissions import IsAdminOrReadOnly
 from .serializers import (
@@ -22,6 +23,8 @@ from .serializers import (
     CartSerializer,
     CartSyncSerializer,
     FavoriteResponseSerializer,
+    MockPaymentSerializer,
+    OrderSerializer,
     UpdateCartItemSerializer,
 )
 
@@ -293,4 +296,88 @@ class CartSyncView(APIView):
 
         cart.save(update_fields=["updated_at"])
         return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+
+class MockPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Payments"],
+        summary="Pay for the current cart using the mock gateway",
+        request=MockPaymentSerializer,
+        responses={200: OrderSerializer},
+    )
+    @transaction.atomic
+    def post(self, request):
+        serializer = MockPaymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        cart = Cart.objects.select_for_update().filter(user=request.user).first()
+        if not cart:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError({"cart": "The cart is empty."})
+
+        items = list(
+            CartItem.objects.select_for_update()
+            .filter(cart=cart)
+            .select_related("book")
+        )
+        if not items:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError({"cart": "The cart is empty."})
+
+        books = {
+            book.pk: book
+            for book in Book.objects.select_for_update().filter(
+                pk__in=[item.book_id for item in items]
+            )
+        }
+        total = sum(books[item.book_id].price * item.quantity for item in items)
+        succeeded = serializer.validated_data["succeed"]
+
+        order = Order.objects.create(
+            user=request.user,
+            status=Order.Status.PAID if succeeded else Order.Status.FAILED,
+            total_amount=total,
+            paid_at=timezone.now() if succeeded else None,
+        )
+        OrderItem.objects.bulk_create(
+            OrderItem(
+                order=order,
+                book=books[item.book_id],
+                title=books[item.book_id].title,
+                unit_price=books[item.book_id].price,
+                quantity=item.quantity,
+            )
+            for item in items
+        )
+
+        if succeeded:
+            unavailable = [
+                item for item in items if item.quantity > books[item.book_id].stock
+            ]
+            if unavailable:
+                from rest_framework.exceptions import ValidationError
+
+                raise ValidationError(
+                    {
+                        "stock": [
+                            f"Only {books[item.book_id].stock} copies of "
+                            f"{books[item.book_id].title} are available."
+                            for item in unavailable
+                        ]
+                    }
+                )
+
+            for item in items:
+                Book.objects.filter(pk=item.book_id).update(
+                    stock=F("stock") - item.quantity
+                )
+            CartItem.objects.filter(cart=cart).delete()
+            cart.save(update_fields=["updated_at"])
+
+        order = Order.objects.prefetch_related("items").get(pk=order.pk)
+        return Response(OrderSerializer(order).data)
 # End of cart API views.

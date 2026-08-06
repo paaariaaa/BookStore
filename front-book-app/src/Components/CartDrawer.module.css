@@ -14,6 +14,7 @@
 .close:hover { background: #173f35; color: white; transform: rotate(8deg); }
 .close svg { font-size: 1.25rem; }
 .items { flex: 1; display: grid; align-content: start; gap: 10px; padding: 18px; overflow-y: auto; }
+.paymentMessage { padding: 11px 13px; border: 1px solid #a9d6c6; border-radius: 10px; background: #e2f3ec; color: #17624d; font: 700 .75rem/1.5 Inter, sans-serif; }
 .item { position: relative; display: grid; grid-template-columns: 70px minmax(0,1fr) auto; gap: 13px; align-items: center; padding: 12px; background: rgba(255,255,255,.66); border: 1px solid #e0d7c9; border-radius: 16px; animation: itemIn .35s ease both; }
 .cover { width: 70px; height: 94px; display: grid; place-items: center; overflow: hidden; padding: 0; border: 0; border-radius: 6px 11px 11px 6px; background: linear-gradient(135deg,#24594b,#dc6d42); color: white; box-shadow: 7px 8px 15px rgba(33,39,35,.16); cursor: pointer; }
 .cover img { width: 100%; height: 100%; object-fit: cover; }
@@ -33,6 +34,10 @@
 .summary div span { color: #71756f; }
 .summary div strong { color: #173f35; }
 .summary p { grid-column: 1/-1; margin-top: 3px; color: #8a887f; font: .67rem/1.5 Inter, sans-serif; text-align: center; }
+.summary .payButton { grid-column: 1/-1; min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 11px; background: #173f35; color: white; font: 800 .78rem Inter, sans-serif; cursor: pointer; }
+.summary .payButton:hover { background: #24594b; }
+.summary .payButton:disabled { opacity: .6; cursor: wait; }
+.summary .payButton svg { font-size: 1.15rem; }
 .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }
 .empty > div { position: relative; width: 90px; height: 90px; display: grid; place-items: center; margin-bottom: 22px; border-radius: 50%; background: #e8e0d3; color: #24594b; }
 .empty > div svg:first-child { font-size: 2.7rem; }

@@ -74,6 +74,8 @@ function App() {
   const [cartSubtotal, setCartSubtotal] = useState('0.00');
   const [cartError, setCartError] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState('');
 
   const isAuthRoute = route === '/login' || route === '/register';
   const isBookDetailsRoute = route.startsWith('/books/');
@@ -266,6 +268,32 @@ function App() {
     }
   };
 
+  const checkout = async () => {
+    setCartError('');
+    setPaymentMessage('');
+
+    if (!currentUser) {
+      closeCart();
+      navigate('/login');
+      return;
+    }
+
+    setIsPaying(true);
+    try {
+      const order = await apiRequest('/api/books/cart/pay/mock/', {
+        body: { succeed: true },
+        method: 'POST',
+      });
+      setCart([]);
+      setCartSubtotal('0.00');
+      setPaymentMessage(`Payment successful. Order reference: ${order.reference}`);
+    } catch (error) {
+      setCartError(error.message);
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
   const getCartQuantity = (bookIdToFind) => cart.find((item) => String(item.id) === String(bookIdToFind))?.quantity || 0;
   const closeCart = useCallback(() => setIsCartOpen(false), []);
 
@@ -378,12 +406,15 @@ function App() {
       <CartDrawer
         cart={cart}
         isOpen={isCartOpen}
+        isPaying={isPaying}
         onChangeQuantity={changeCartQuantity}
+        onCheckout={checkout}
         onClose={closeCart}
         onOpenBook={(book) => navigate(`/books/${book.id}`)}
         onRemove={removeFromCart}
         onClear={clearCart}
         error={cartError}
+        paymentMessage={paymentMessage}
         subtotal={displayedCartSubtotal}
       />
       {isAuthRoute ? (

@@ -2,12 +2,12 @@ import { AiFillHeart } from "react-icons/ai";
 import { IoAddOutline, IoBagAddOutline, IoRemoveOutline } from 'react-icons/io5';
 import PropTypes from 'prop-types';
 
-import { resolveMediaUrl } from '../services/api';
+import { formatToman, resolveMediaUrl } from '../services/api';
 import styles from './BooksCard.module.css';
 
 function BookCard({ cartQuantity, data, isLiked, handleLikedList, onAddToCart, onChangeCartQuantity, onOpenBook }) {
 
-	const { title, author, image, language, pages } = data;
+	const { title, author, image, language, pages, price, stock } = data;
 	const coverImage = resolveMediaUrl(image);
 
 	const likeHandler = (event) => {
@@ -48,6 +48,7 @@ function BookCard({ cartQuantity, data, isLiked, handleLikedList, onAddToCart, o
 				<div>
 					<span>{language}</span>
 					<span>{pages}</span>
+					<span>{formatToman(price)}</span>
 				</div>
 			</div>
 			<div className={styles.actions}>
@@ -61,7 +62,7 @@ function BookCard({ cartQuantity, data, isLiked, handleLikedList, onAddToCart, o
 						<button type="button" onClick={(event) => quantityHandler(event, 1)} aria-label={`Increase ${title}`}><IoAddOutline /></button>
 					</div>
 				) : (
-					<button className={styles.addButton} type="button" onClick={cartHandler}><IoBagAddOutline /><span>Add</span></button>
+					<button className={styles.addButton} type="button" onClick={cartHandler} disabled={!stock}><IoBagAddOutline /><span>{stock ? 'Add' : 'Sold out'}</span></button>
 				)}
 			</div>
 		</div>
@@ -76,6 +77,8 @@ BookCard.propTypes = {
 		image: PropTypes.string,
 		language: PropTypes.string,
 		pages: PropTypes.number,
+		price: PropTypes.string,
+		stock: PropTypes.number,
 		title: PropTypes.string.isRequired,
 	}).isRequired,
 	handleLikedList: PropTypes.func.isRequired,

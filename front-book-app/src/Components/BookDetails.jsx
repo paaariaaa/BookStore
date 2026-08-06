@@ -16,7 +16,8 @@ import {
 	IoTimeOutline,
 } from 'react-icons/io5';
 
-import { apiRequest, getArrayPayload, getSinglePayload, resolveMediaUrl } from '../services/api';
+import { apiRequest, formatToman, getArrayPayload, getSinglePayload, resolveMediaUrl } from '../services/api';
+import BookReviews from './BookReviews';
 import styles from './BookDetails.module.css';
 
 const formatDate = (date) => {
@@ -78,14 +79,16 @@ const getBookDetails = (book) => ({
 	isbn: book.isbn,
 	language: book.language,
 	pages: book.pages,
+	price: book.price,
 	publishedYear: book.publishedYear ?? book.published_year ?? book.year,
+	stock: book.stock,
 	title: book.title,
 	updatedAt: book.updatedAt ?? book.updated_at,
 });
 
 const getFavoriteStatus = (book = {}) => book.isFavorite ?? book.is_favorite;
 
-function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteStatus, onAddToCart, onBack, onChangeCartQuantity, onOpenBook, onToggleFavorite }) {
+function BookDetails({ book, bookId, cartQuantity, currentUser, isBookFavorite = getFavoriteStatus, onAddToCart, onBack, onChangeCartQuantity, onLoginClick, onOpenBook, onToggleFavorite, refreshKey }) {
 	const [serverBook, setServerBook] = useState(book);
 	const [catalogBooks, setCatalogBooks] = useState([]);
 	const [catalogLoading, setCatalogLoading] = useState(false);
@@ -121,7 +124,7 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 		return () => {
 			isActive = false;
 		};
-	}, [book, bookId]);
+	}, [book, bookId, refreshKey]);
 
 	useEffect(() => {
 		let isActive = true;
@@ -146,7 +149,7 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 		return () => {
 			isActive = false;
 		};
-	}, []);
+	}, [refreshKey]);
 
 	if (!serverBook && isLoading) {
 		return (
@@ -276,7 +279,7 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 					</div>
 
 					<div className={styles.purchaseBar}>
-						<div><span>ADD TO READING BAG</span><strong>{cartQuantity ? `${cartQuantity} ${cartQuantity === 1 ? 'copy' : 'copies'} selected` : 'Choose this edition'}</strong></div>
+						<div><span>{formatToman(details.price)} · {details.stock} available</span><strong>{cartQuantity ? `${cartQuantity} ${cartQuantity === 1 ? 'copy' : 'copies'} selected` : 'Choose this edition'}</strong></div>
 						{cartQuantity ? (
 							<div className={styles.purchaseQuantity}>
 								<button type="button" onClick={() => onChangeCartQuantity(details.id, -1)} aria-label={`Decrease ${details.title}`}><IoRemoveOutline /></button>
@@ -284,7 +287,7 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 								<button type="button" onClick={() => onChangeCartQuantity(details.id, 1)} aria-label={`Increase ${details.title}`}><IoAddOutline /></button>
 							</div>
 						) : (
-							<button className={styles.purchaseButton} type="button" onClick={() => onAddToCart(serverBook)}><IoBagAddOutline /> Add to bag</button>
+							<button className={styles.purchaseButton} type="button" onClick={() => onAddToCart(serverBook)} disabled={!details.stock}><IoBagAddOutline /> {details.stock ? 'Add to Cart' : 'Sold out'}</button>
 						)}
 					</div>
 				</div>
@@ -311,6 +314,13 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 					<strong>{formatDate(details.updatedAt)}</strong>
 				</div>
 			</section>
+
+			<BookReviews
+				bookId={details.id}
+				bookTitle={details.title}
+				currentUser={currentUser}
+				onLoginClick={onLoginClick}
+			/>
 
 			<section className={styles.relatedShelf}>
 				<div className={styles.relatedHeader}>
@@ -358,12 +368,19 @@ BookDetails.propTypes = {
 	book: PropTypes.object,
 	bookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
 	cartQuantity: PropTypes.number.isRequired,
+	currentUser: PropTypes.shape({
+		displayName: PropTypes.string,
+		is_staff: PropTypes.bool,
+		username: PropTypes.string,
+	}),
 	isBookFavorite: PropTypes.func,
 	onAddToCart: PropTypes.func.isRequired,
 	onBack: PropTypes.func.isRequired,
 	onChangeCartQuantity: PropTypes.func.isRequired,
+	onLoginClick: PropTypes.func.isRequired,
 	onOpenBook: PropTypes.func.isRequired,
 	onToggleFavorite: PropTypes.func.isRequired,
+	refreshKey: PropTypes.number.isRequired,
 };
 
 export default BookDetails;

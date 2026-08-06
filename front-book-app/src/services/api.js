@@ -1,9 +1,8 @@
-const DEFAULT_API_BASE_URL = '';
+const API_BASE_URL = 'http://127.0.0.1:8000';
 const ACCESS_TOKEN_KEY = 'book-app-auth-token';
 const REFRESH_TOKEN_KEY = 'book-app-refresh-token';
 const AUTH_USER_KEY = 'book-app-auth-user';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/+$/, '');
 let refreshRequest = null;
 
 const notifySessionExpired = () => {
@@ -101,7 +100,10 @@ const refreshAccessToken = async () => {
 	if (refreshRequest) return refreshRequest;
 
 	const currentRefresh = getStoredRefreshToken();
-	if (!currentRefresh) throw new Error('Your session has expired. Please sign in again.');
+	if (!currentRefresh) {
+		notifySessionExpired();
+		throw new Error('Your session has expired. Please sign in again.');
+	}
 
 	refreshRequest = (async () => {
 		const response = await fetch(apiUrl('/api/auth/refresh/'), {
@@ -159,7 +161,15 @@ export const apiRequest = async (path, options = {}) => {
 	});
 	const payload = await parseResponse(response);
 
-	if (response.status === 401 && retryOnUnauthorized && getStoredRefreshToken()) {
+	if (response.status === 401 && retryOnUnauthorized) {
+		if (!getStoredRefreshToken()) {
+			notifySessionExpired();
+			const error = new Error(getErrorMessage(payload) || 'Your session has expired.');
+			error.status = response.status;
+			error.payload = payload;
+			throw error;
+		}
+
 		const freshAccess = await refreshAccessToken();
 
 		return apiRequest(path, {
@@ -170,7 +180,7 @@ export const apiRequest = async (path, options = {}) => {
 	}
 
 	if (!response.ok) {
-		const error = new Error(getErrorMessage(payload));
+		const error = new Error(response.status === 403 ? 'دسترسی ندارید' : getErrorMessage(payload));
 		error.status = response.status;
 		error.payload = payload;
 		throw error;
@@ -205,3 +215,5 @@ export const resolveMediaUrl = (path) => {
 
 	return apiUrl(mediaPath);
 };
+
+export const formatToman = (value) => `${new Intl.NumberFormat('en-US').format(Number(value || 0))} T`;

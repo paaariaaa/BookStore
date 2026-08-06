@@ -8,7 +8,7 @@ import SideCard from './SideCard';
 
 const getFavoriteStatus = (book) => book.isFavorite ?? book.is_favorite;
 
-function Book({ getCartQuantity, isBookFavorite = getFavoriteStatus, onAddToCart, onChangeCartQuantity, onOpenBook, onToggleFavorite }) {
+function Book({ getCartQuantity, isBookFavorite = getFavoriteStatus, onAddToCart, onChangeCartQuantity, onOpenBook, onToggleFavorite, refreshKey }) {
 	const [sourceBooks, setSourceBooks] = useState([]);
 	const [books, setBooks] = useState([]);
 	const [search, setSearch] = useState('');
@@ -55,7 +55,7 @@ function Book({ getCartQuantity, isBookFavorite = getFavoriteStatus, onAddToCart
 		return () => {
 			isActive = false;
 		};
-	}, []);
+	}, [refreshKey]);
 
 	const searchHandler = () => {
 		const normalizedSearch = search.trim();
@@ -107,6 +107,7 @@ Book.propTypes = {
 	onChangeCartQuantity: PropTypes.func.isRequired,
 	onOpenBook: PropTypes.func.isRequired,
 	onToggleFavorite: PropTypes.func.isRequired,
+	refreshKey: PropTypes.number.isRequired,
 };
 
 export default Book

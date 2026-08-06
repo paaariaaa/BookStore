@@ -1,15 +1,34 @@
-from django.db.models import BooleanField, Exists, OuterRef, Value
+from django.db import transaction
+from django.db.models import BooleanField, Exists, F, OuterRef, Value
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 
-from books.models import Book, Favorite
+from books.models import Book, BookReview, Cart, CartItem, Favorite, Order, OrderItem
 
-from .serializers import BookSerializer
+from .permissions import IsAdminOrReadOnly, IsReviewOwnerOrStaff
+from .serializers import (
+    AddCartItemSerializer,
+    BookSerializer,
+    BookReviewSerializer,
+    CartSerializer,
+    CartSyncSerializer,
+    FavoriteResponseSerializer,
+    MockPaymentSerializer,
+    OrderSerializer,
+    UpdateCartItemSerializer,
+)
 
 
 def with_favorite_status(queryset, user):
@@ -28,20 +47,85 @@ def with_favorite_status(queryset, user):
     )
 
 
-class BookListView(ListAPIView):
+@extend_schema_view(
+    get=extend_schema(tags=["Books"], summary="List books"),
+)
+class BookListView(ListCreateAPIView):
     serializer_class = BookSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
         return with_favorite_status(Book.objects.all(), self.request.user)
 
 
-class BookDetailView(RetrieveAPIView):
+@extend_schema_view(
+    get=extend_schema(tags=["Books"], summary="Retrieve a book"),
+)
+class BookDetailView(RetrieveUpdateDestroyAPIView):
     serializer_class = BookSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
         return with_favorite_status(Book.objects.all(), self.request.user)
 
 
+@extend_schema_view(
+    get=extend_schema(tags=["Reviews"], summary="List reviews for a book"),
+    post=extend_schema(
+        tags=["Reviews"],
+        summary="Create a review for a book",
+        request=BookReviewSerializer,
+        responses={201: BookReviewSerializer},
+    ),
+)
+class BookReviewListCreateView(ListCreateAPIView):
+    serializer_class = BookReviewSerializer
+    permission_classes = [IsReviewOwnerOrStaff]
+
+    def get_queryset(self):
+        get_object_or_404(Book, pk=self.kwargs["book_id"])
+        return BookReview.objects.filter(
+            book_id=self.kwargs["book_id"],
+        ).select_related("user", "book")
+
+    def perform_create(self, serializer):
+        book = get_object_or_404(Book, pk=self.kwargs["book_id"])
+        serializer.save(book=book, user=self.request.user)
+
+
+@extend_schema_view(
+    get=extend_schema(tags=["Reviews"], summary="Retrieve a book review"),
+    patch=extend_schema(
+        tags=["Reviews"],
+        summary="Update your book review",
+        request=BookReviewSerializer,
+        responses=BookReviewSerializer,
+    ),
+    put=extend_schema(
+        tags=["Reviews"],
+        summary="Replace your book review",
+        request=BookReviewSerializer,
+        responses=BookReviewSerializer,
+    ),
+    delete=extend_schema(
+        tags=["Reviews"],
+        summary="Delete a book review",
+        responses={204: None},
+    ),
+)
+class BookReviewDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = BookReviewSerializer
+    permission_classes = [IsReviewOwnerOrStaff]
+
+    def get_queryset(self):
+        return BookReview.objects.filter(
+            book_id=self.kwargs["book_id"],
+        ).select_related("user", "book")
+
+
+@extend_schema_view(
+    get=extend_schema(tags=["Favorites"], summary="List the current user's favorite books"),
+)
 class FavoriteListView(ListAPIView):
     serializer_class = BookSerializer
     permission_classes = [IsAuthenticated]
@@ -57,6 +141,12 @@ class FavoriteListView(ListAPIView):
 class BookFavoriteView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Favorites"],
+        summary="Add a book to favorites",
+        request=None,
+        responses={200: FavoriteResponseSerializer, 201: FavoriteResponseSerializer},
+    )
     def post(self, request, pk):
         book = get_object_or_404(Book, pk=pk)
         _, created = Favorite.objects.get_or_create(
@@ -76,6 +166,12 @@ class BookFavoriteView(APIView):
             ),
         )
 
+    @extend_schema(
+        tags=["Favorites"],
+        summary="Remove a book from favorites",
+        request=None,
+        responses={204: None},
+    )
     def delete(self, request, pk):
         book = get_object_or_404(Book, pk=pk)
 
@@ -85,3 +181,273 @@ class BookFavoriteView(APIView):
         ).delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def get_cart(user):
+    cart, _ = Cart.objects.get_or_create(user=user)
+    return Cart.objects.prefetch_related("items__book").get(pk=cart.pk)
+
+
+def validate_stock(book, quantity):
+    if quantity > book.stock:
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError(
+            {"quantity": f"Only {book.stock} copies are available."}
+        )
+
+
+class CartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["Cart"], summary="Get the current user's cart", responses=CartSerializer)
+    def get(self, request):
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+    @extend_schema(tags=["Cart"], summary="Clear the cart", request=None, responses=CartSerializer)
+    @transaction.atomic
+    def delete(self, request):
+        cart = Cart.objects.select_for_update().filter(user=request.user).first()
+        if cart:
+            cart.items.all().delete()
+            cart.save(update_fields=["updated_at"])
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+
+class CartItemCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Cart"],
+        summary="Add a book to the cart",
+        request=AddCartItemSerializer,
+        responses={200: CartSerializer, 201: CartSerializer},
+    )
+    @transaction.atomic
+    def post(self, request):
+        serializer = AddCartItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        book = get_object_or_404(
+            Book.objects.select_for_update(),
+            pk=serializer.validated_data["book_id"],
+        )
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        item = CartItem.objects.select_for_update().filter(cart=cart, book=book).first()
+        quantity = serializer.validated_data["quantity"] + (item.quantity if item else 0)
+        validate_stock(book, quantity)
+
+        if item:
+            item.quantity = quantity
+            item.save(update_fields=["quantity", "updated_at"])
+            response_status = status.HTTP_200_OK
+        else:
+            CartItem.objects.create(cart=cart, book=book, quantity=quantity)
+            response_status = status.HTTP_201_CREATED
+
+        cart.save(update_fields=["updated_at"])
+
+        return Response(
+            CartSerializer(get_cart(request.user), context={"request": request}).data,
+            status=response_status,
+        )
+
+
+class CartItemDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Cart"],
+        summary="Set a cart item's quantity",
+        request=UpdateCartItemSerializer,
+        responses=CartSerializer,
+    )
+    @transaction.atomic
+    def patch(self, request, book_id):
+        serializer = UpdateCartItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = get_object_or_404(
+            CartItem.objects.select_for_update().select_related("book", "cart"),
+            cart__user=request.user,
+            book_id=book_id,
+        )
+        quantity = serializer.validated_data["quantity"]
+        validate_stock(item.book, quantity)
+        item.quantity = quantity
+        item.save(update_fields=["quantity", "updated_at"])
+        item.cart.save(update_fields=["updated_at"])
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+    @extend_schema(
+        tags=["Cart"],
+        summary="Remove a book from the cart",
+        request=None,
+        responses=CartSerializer,
+    )
+    @transaction.atomic
+    def delete(self, request, book_id):
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        CartItem.objects.select_for_update().filter(
+            cart=cart,
+            book_id=book_id,
+        ).delete()
+        cart.save(update_fields=["updated_at"])
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+class CartSyncView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Cart"],
+        summary="Merge a guest cart into the current user's cart",
+        request=CartSyncSerializer,
+        responses=CartSerializer,
+    )
+    @transaction.atomic
+    def post(self, request):
+        serializer = CartSyncSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        requested_items = serializer.validated_data["items"]
+        book_ids = [item["book_id"] for item in requested_items]
+        books = {
+            book.pk: book
+            for book in Book.objects.select_for_update().filter(pk__in=book_ids)
+        }
+
+        if len(books) != len(book_ids):
+            missing_ids = sorted(set(book_ids) - set(books))
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError({"book_id": f"Unknown books: {missing_ids}"})
+
+        for item_data in requested_items:
+            validate_stock(
+                books[item_data["book_id"]],
+                item_data["quantity"],
+            )
+
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        existing_items = {
+            item.book_id: item
+            for item in CartItem.objects.select_for_update().filter(
+                cart=cart,
+                book_id__in=book_ids,
+            )
+        }
+
+        for item_data in requested_items:
+            book_id = item_data["book_id"]
+            item = existing_items.get(book_id)
+            if item:
+                item.quantity = max(item.quantity, item_data["quantity"])
+                item.save(update_fields=["quantity", "updated_at"])
+            else:
+                CartItem.objects.create(
+                    cart=cart,
+                    book=books[book_id],
+                    quantity=item_data["quantity"],
+                )
+
+        cart.save(update_fields=["updated_at"])
+        return Response(CartSerializer(get_cart(request.user), context={"request": request}).data)
+
+
+class MockPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Payments"],
+        summary="Pay for the current cart using the mock gateway",
+        request=MockPaymentSerializer,
+        responses={200: OrderSerializer},
+    )
+    @transaction.atomic
+    def post(self, request):
+        serializer = MockPaymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        idempotency_key = serializer.validated_data.get("idempotency_key")
+
+        if idempotency_key:
+            existing_order = (
+                Order.objects.prefetch_related("items")
+                .filter(user=request.user, idempotency_key=idempotency_key)
+                .first()
+            )
+            if existing_order:
+                return Response(OrderSerializer(existing_order).data)
+
+        cart = Cart.objects.select_for_update().filter(user=request.user).first()
+        if not cart:
+            raise ValidationError({"cart": "The cart is empty."})
+
+        if idempotency_key:
+            existing_order = (
+                Order.objects.prefetch_related("items")
+                .filter(user=request.user, idempotency_key=idempotency_key)
+                .first()
+            )
+            if existing_order:
+                return Response(OrderSerializer(existing_order).data)
+
+        items = list(
+            CartItem.objects.select_for_update()
+            .filter(cart=cart)
+            .select_related("book")
+        )
+        if not items:
+            raise ValidationError({"cart": "The cart is empty."})
+
+        books = {
+            book.pk: book
+            for book in Book.objects.select_for_update().filter(
+                pk__in=[item.book_id for item in items]
+            )
+        }
+        total = sum(books[item.book_id].price * item.quantity for item in items)
+        succeeded = serializer.validated_data["succeed"]
+
+        order = Order.objects.create(
+            user=request.user,
+            status=Order.Status.PAID if succeeded else Order.Status.FAILED,
+            total_amount=total,
+            idempotency_key=idempotency_key,
+            paid_at=timezone.now() if succeeded else None,
+        )
+        OrderItem.objects.bulk_create(
+            OrderItem(
+                order=order,
+                book=books[item.book_id],
+                title=books[item.book_id].title,
+                unit_price=books[item.book_id].price,
+                quantity=item.quantity,
+            )
+            for item in items
+        )
+
+        if succeeded:
+            unavailable = [
+                item for item in items if item.quantity > books[item.book_id].stock
+            ]
+            if unavailable:
+                raise ValidationError(
+                    {
+                        "stock": [
+                            f"Only {books[item.book_id].stock} copies of "
+                            f"{books[item.book_id].title} are available."
+                            for item in unavailable
+                        ]
+                    }
+                )
+
+            for item in items:
+                Book.objects.filter(pk=item.book_id).update(
+                    stock=F("stock") - item.quantity
+                )
+            CartItem.objects.filter(cart=cart).delete()
+            cart.save(update_fields=["updated_at"])
+
+        order = Order.objects.prefetch_related("items").get(pk=order.pk)
+        return Response(OrderSerializer(order).data)
+# End of cart API views.

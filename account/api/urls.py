@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     LoginView,
     LogoutView,
+    PasswordChangeView,
     ProfileView,
     RefreshView,
     RegisterView,
@@ -35,6 +36,11 @@ urlpatterns = [
         "profile/",
         ProfileView.as_view(),
         name="profile",
+    ),
+    path(
+        "profile/password/",
+        PasswordChangeView.as_view(),
+        name="profile-password",
     ),
     path(
         "users/",

@@ -20,6 +20,92 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["is_staff"]
 
 
+class AdminUserSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "role",
+            "date_joined",
+            "last_login",
+        ]
+        read_only_fields = [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "is_staff",
+            "is_superuser",
+            "date_joined",
+            "last_login",
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["role"] = self.get_role(instance)
+        return data
+
+    def get_role(self, instance):
+        if instance.is_superuser:
+            return "superadmin"
+        if instance.is_staff:
+            return "admin"
+        return "customer"
+
+    def validate_role(self, value):
+        if value not in {"admin", "customer"}:
+            raise serializers.ValidationError(
+                "Role must be either 'admin' or 'customer'."
+            )
+
+        return value
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        target = self.instance
+        requested_role = attrs.get("role")
+
+        if target and target.is_superuser and target != request.user:
+            raise serializers.ValidationError(
+                {"detail": "Superuser accounts cannot be changed through this API."}
+            )
+
+        if target == request.user:
+            if attrs.get("is_active") is False:
+                raise serializers.ValidationError(
+                    {"is_active": "You cannot deactivate your own account."}
+                )
+            if requested_role == "customer":
+                raise serializers.ValidationError(
+                    {"role": "You cannot remove your own administrator access."}
+                )
+
+        if not attrs.get("is_active", True) and target and target.is_superuser:
+            raise serializers.ValidationError(
+                {"is_active": "Superuser accounts cannot be deactivated here."}
+            )
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        requested_role = validated_data.pop("role", None)
+
+        if requested_role:
+            instance.is_staff = requested_role == "admin"
+
+        return super().update(instance, validated_data)
+
+
 class AuthResponseSerializer(serializers.Serializer):
     user = UserSerializer(read_only=True)
     access = serializers.CharField(read_only=True)

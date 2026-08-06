@@ -1,0 +1,309 @@
+.section {
+	margin-top: 22px;
+	padding: 26px;
+	background:
+		linear-gradient(135deg, rgba(101, 82, 244, 0.12), rgba(47, 184, 166, 0.06)),
+		#303030;
+	border: 1px solid rgba(224, 224, 224, 0.08);
+	border-radius: 10px;
+}
+
+.header,
+.formHeader,
+.reviewTopline,
+.formActions,
+.loginPrompt {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.kicker {
+	color: #a9a4c6;
+	font-size: 0.72rem;
+	font-weight: 900;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+}
+
+.header h3 {
+	margin-top: 5px;
+	color: #ffffff;
+	font-size: 1.65rem;
+}
+
+.header p,
+.formHeader span,
+.loginPrompt span,
+.reviewTopline span {
+	color: #aaa5bf;
+	font-size: 0.84rem;
+}
+
+.summary {
+	display: grid;
+	justify-items: end;
+	gap: 4px;
+}
+
+.summary strong {
+	color: #f5c451;
+	font-size: 1.6rem;
+}
+
+.summary span {
+	color: #aaa5bf;
+	font-size: 0.74rem;
+}
+
+.stars {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	color: #f5c451;
+}
+
+.stars svg {
+	font-size: 1rem;
+}
+
+.interactiveStars {
+	gap: 5px;
+}
+
+.starButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px;
+	background: none;
+	border: 0;
+	color: #f5c451;
+	cursor: pointer;
+	transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.starButton:hover,
+.starButton:focus-visible {
+	color: #ffe18a;
+	transform: translateY(-2px) scale(1.08);
+}
+
+.form {
+	display: grid;
+	gap: 16px;
+	margin-top: 22px;
+	padding: 18px;
+	background: rgba(15, 20, 18, 0.32);
+	border: 1px solid rgba(224, 224, 224, 0.08);
+	border-radius: 10px;
+}
+
+.formHeader strong,
+.loginPrompt strong {
+	display: block;
+	margin-bottom: 4px;
+	color: #ffffff;
+	font-size: 0.98rem;
+}
+
+.commentField {
+	position: relative;
+	display: grid;
+	gap: 8px;
+}
+
+.commentField > span {
+	color: #d8d4ff;
+	font-size: 0.78rem;
+	font-weight: 900;
+}
+
+.commentField textarea {
+	min-height: 104px;
+	padding: 12px;
+	resize: vertical;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1px solid rgba(224, 224, 224, 0.12);
+	border-radius: 8px;
+	color: #ffffff;
+	font: inherit;
+	line-height: 1.55;
+	outline: none;
+}
+
+.commentField textarea:focus {
+	border-color: rgba(101, 82, 244, 0.78);
+	box-shadow: 0 0 0 3px rgba(101, 82, 244, 0.12);
+}
+
+.commentField small {
+	justify-self: end;
+	margin-top: -5px;
+	color: #8d899e;
+	font-size: 0.7rem;
+}
+
+.submitButton,
+.secondaryButton,
+.loginPrompt button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	min-height: 38px;
+	padding: 0 14px;
+	border-radius: 8px;
+	font-size: 0.78rem;
+	font-weight: 900;
+	cursor: pointer;
+}
+
+.submitButton,
+.loginPrompt button {
+	background: linear-gradient(135deg, #493bbb, #6552f4);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color: #ffffff;
+}
+
+.submitButton:hover,
+.loginPrompt button:hover {
+	filter: brightness(1.1);
+}
+
+.submitButton:disabled,
+.reviewActions button:disabled {
+	cursor: wait;
+	opacity: 0.62;
+}
+
+.secondaryButton {
+	background: rgba(255, 255, 255, 0.06);
+	border: 1px solid rgba(224, 224, 224, 0.14);
+	color: #d8d4ff;
+}
+
+.loginPrompt {
+	margin-top: 22px;
+	padding: 17px 18px;
+	background: rgba(15, 20, 18, 0.32);
+	border: 1px solid rgba(224, 224, 224, 0.08);
+	border-radius: 10px;
+}
+
+.error,
+.notice {
+	margin-top: 16px;
+	padding: 10px 12px;
+	border-radius: 7px;
+	font-size: 0.82rem;
+	font-weight: 800;
+}
+
+.error {
+	background: rgba(242, 95, 92, 0.12);
+	border: 1px solid rgba(242, 95, 92, 0.28);
+	color: #ffaaa7;
+}
+
+.notice {
+	background: rgba(47, 184, 166, 0.12);
+	border: 1px solid rgba(47, 184, 166, 0.28);
+	color: #92eee0;
+}
+
+.list {
+	display: grid;
+	gap: 10px;
+	margin-top: 22px;
+}
+
+.reviewCard {
+	padding: 17px 18px;
+	background: rgba(255, 255, 255, 0.045);
+	border: 1px solid rgba(224, 224, 224, 0.08);
+	border-radius: 9px;
+}
+
+.reviewTopline > div {
+	display: grid;
+	gap: 3px;
+}
+
+.reviewTopline strong {
+	color: #ffffff;
+	font-size: 0.9rem;
+}
+
+.reviewCard > p {
+	margin-top: 13px;
+	color: #d4d1dc;
+	font-size: 0.9rem;
+	line-height: 1.65;
+	white-space: pre-wrap;
+}
+
+.reviewActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 13px;
+}
+
+.reviewActions button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 5px 8px;
+	background: none;
+	border: 0;
+	color: #aaa5bf;
+	font-size: 0.74rem;
+	font-weight: 900;
+	cursor: pointer;
+}
+
+.reviewActions button:hover {
+	color: #ffffff;
+}
+
+.reviewActions button:last-child:hover {
+	color: #ffaaa7;
+}
+
+.empty {
+	padding: 18px;
+	color: #aaa5bf;
+	font-size: 0.86rem;
+	text-align: center;
+}
+
+@media (max-width: 560px) {
+	.section {
+		padding: 19px;
+	}
+
+	.header,
+	.formHeader,
+	.loginPrompt {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.summary {
+		justify-items: start;
+	}
+
+	.formActions {
+		justify-content: stretch;
+	}
+
+	.formActions > button {
+		flex: 1;
+	}
+
+	.loginPrompt button {
+		width: 100%;
+	}
+}

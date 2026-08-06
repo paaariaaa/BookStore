@@ -17,6 +17,7 @@ import {
 } from 'react-icons/io5';
 
 import { apiRequest, formatToman, getArrayPayload, getSinglePayload, resolveMediaUrl } from '../services/api';
+import BookReviews from './BookReviews';
 import styles from './BookDetails.module.css';
 
 const formatDate = (date) => {
@@ -87,7 +88,7 @@ const getBookDetails = (book) => ({
 
 const getFavoriteStatus = (book = {}) => book.isFavorite ?? book.is_favorite;
 
-function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteStatus, onAddToCart, onBack, onChangeCartQuantity, onOpenBook, onToggleFavorite }) {
+function BookDetails({ book, bookId, cartQuantity, currentUser, isBookFavorite = getFavoriteStatus, onAddToCart, onBack, onChangeCartQuantity, onLoginClick, onOpenBook, onToggleFavorite }) {
 	const [serverBook, setServerBook] = useState(book);
 	const [catalogBooks, setCatalogBooks] = useState([]);
 	const [catalogLoading, setCatalogLoading] = useState(false);
@@ -314,6 +315,12 @@ function BookDetails({ book, bookId, cartQuantity, isBookFavorite = getFavoriteS
 				</div>
 			</section>
 
+			<BookReviews
+				bookId={details.id}
+				currentUser={currentUser}
+				onLoginClick={onLoginClick}
+			/>
+
 			<section className={styles.relatedShelf}>
 				<div className={styles.relatedHeader}>
 					<div>
@@ -360,10 +367,14 @@ BookDetails.propTypes = {
 	book: PropTypes.object,
 	bookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
 	cartQuantity: PropTypes.number.isRequired,
+	currentUser: PropTypes.shape({
+		username: PropTypes.string,
+	}),
 	isBookFavorite: PropTypes.func,
 	onAddToCart: PropTypes.func.isRequired,
 	onBack: PropTypes.func.isRequired,
 	onChangeCartQuantity: PropTypes.func.isRequired,
+	onLoginClick: PropTypes.func.isRequired,
 	onOpenBook: PropTypes.func.isRequired,
 	onToggleFavorite: PropTypes.func.isRequired,
 };

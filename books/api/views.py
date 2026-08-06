@@ -2,7 +2,11 @@ from django.db import transaction
 from django.db.models import BooleanField, Exists, OuterRef, Value
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,6 +15,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from books.models import Book, Cart, CartItem, Favorite
 
+from .permissions import IsAdminOrReadOnly
 from .serializers import (
     AddCartItemSerializer,
     BookSerializer,
@@ -40,8 +45,9 @@ def with_favorite_status(queryset, user):
 @extend_schema_view(
     get=extend_schema(tags=["Books"], summary="List books"),
 )
-class BookListView(ListAPIView):
+class BookListView(ListCreateAPIView):
     serializer_class = BookSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
         return with_favorite_status(Book.objects.all(), self.request.user)
@@ -50,8 +56,9 @@ class BookListView(ListAPIView):
 @extend_schema_view(
     get=extend_schema(tags=["Books"], summary="Retrieve a book"),
 )
-class BookDetailView(RetrieveAPIView):
+class BookDetailView(RetrieveUpdateDestroyAPIView):
     serializer_class = BookSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
         return with_favorite_status(Book.objects.all(), self.request.user)

@@ -10,6 +10,72 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from books.models import Book, CartItem, Favorite
 
 
+class BookAdminApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username="customer", password="password-123")
+        self.admin = User.objects.create_user(
+            username="catalog-admin",
+            password="password-123",
+            is_staff=True,
+        )
+        self.book = Book.objects.create(title="Existing Book", author="Author")
+
+    def authenticate(self, user):
+        token = RefreshToken.for_user(user).access_token
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    def test_everyone_can_read_books(self):
+        self.assertEqual(self.client.get("/api/books/").status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self.client.get(f"/api/books/{self.book.pk}/").status_code,
+            status.HTTP_200_OK,
+        )
+
+    def test_guest_and_regular_user_cannot_change_catalog(self):
+        payload = {"title": "New Book", "author": "New Author"}
+        self.assertEqual(
+            self.client.post("/api/books/", payload, format="json").status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+        self.authenticate(self.user)
+        self.assertEqual(
+            self.client.post("/api/books/", payload, format="json").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.patch(
+                f"/api/books/{self.book.pk}/",
+                {"title": "Changed"},
+                format="json",
+            ).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/books/{self.book.pk}/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_admin_can_create_update_and_delete_books(self):
+        self.authenticate(self.admin)
+        created = self.client.post(
+            "/api/books/",
+            {"title": "New Book", "author": "New Author", "price": "10.00", "stock": 5},
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+
+        book_url = f"/api/books/{created.data['id']}/"
+        updated = self.client.patch(book_url, {"stock": 9}, format="json")
+        self.assertEqual(updated.status_code, status.HTTP_200_OK)
+        self.assertEqual(updated.data["stock"], 9)
+
+        deleted = self.client.delete(book_url)
+        self.assertEqual(deleted.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Book.objects.filter(pk=created.data["id"]).exists())
+
+
 class FavoriteApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()

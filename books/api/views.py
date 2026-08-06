@@ -10,6 +10,7 @@ from rest_framework.generics import (
 )
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
@@ -366,12 +367,29 @@ class MockPaymentView(APIView):
     def post(self, request):
         serializer = MockPaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        idempotency_key = serializer.validated_data.get("idempotency_key")
+
+        if idempotency_key:
+            existing_order = (
+                Order.objects.prefetch_related("items")
+                .filter(user=request.user, idempotency_key=idempotency_key)
+                .first()
+            )
+            if existing_order:
+                return Response(OrderSerializer(existing_order).data)
 
         cart = Cart.objects.select_for_update().filter(user=request.user).first()
         if not cart:
-            from rest_framework.exceptions import ValidationError
-
             raise ValidationError({"cart": "The cart is empty."})
+
+        if idempotency_key:
+            existing_order = (
+                Order.objects.prefetch_related("items")
+                .filter(user=request.user, idempotency_key=idempotency_key)
+                .first()
+            )
+            if existing_order:
+                return Response(OrderSerializer(existing_order).data)
 
         items = list(
             CartItem.objects.select_for_update()
@@ -379,8 +397,6 @@ class MockPaymentView(APIView):
             .select_related("book")
         )
         if not items:
-            from rest_framework.exceptions import ValidationError
-
             raise ValidationError({"cart": "The cart is empty."})
 
         books = {
@@ -396,6 +412,7 @@ class MockPaymentView(APIView):
             user=request.user,
             status=Order.Status.PAID if succeeded else Order.Status.FAILED,
             total_amount=total,
+            idempotency_key=idempotency_key,
             paid_at=timezone.now() if succeeded else None,
         )
         OrderItem.objects.bulk_create(
@@ -414,8 +431,6 @@ class MockPaymentView(APIView):
                 item for item in items if item.quantity > books[item.book_id].stock
             ]
             if unavailable:
-                from rest_framework.exceptions import ValidationError
-
                 raise ValidationError(
                     {
                         "stock": [

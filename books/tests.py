@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -421,6 +423,57 @@ class CartApiTests(TestCase):
         self.book.refresh_from_db()
         self.assertEqual(self.book.stock, 3)
         self.assertTrue(CartItem.objects.filter(cart__user=self.user).exists())
+
+    def test_idempotency_key_does_not_charge_the_cart_twice(self):
+        self.authenticate()
+        self.client.post(
+            "/api/books/cart/items/",
+            {"book_id": self.book.pk, "quantity": 2},
+            format="json",
+        )
+        idempotency_key = str(uuid.uuid4())
+        payment_url = "/api/books/cart/pay/mock/"
+
+        first_response = self.client.post(
+            payment_url,
+            {"succeed": True, "idempotency_key": idempotency_key},
+            format="json",
+        )
+        repeated_response = self.client.post(
+            payment_url,
+            {"succeed": True, "idempotency_key": idempotency_key},
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(repeated_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_response.data["id"], repeated_response.data["id"])
+        self.assertEqual(first_response.data["reference"], repeated_response.data["reference"])
+        self.assertEqual(Order.objects.filter(user=self.user).count(), 1)
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.stock, 1)
+        self.assertFalse(CartItem.objects.filter(cart__user=self.user).exists())
+
+    def test_insufficient_stock_rolls_back_order_and_keeps_cart(self):
+        self.authenticate()
+        self.client.post(
+            "/api/books/cart/items/",
+            {"book_id": self.book.pk, "quantity": 2},
+            format="json",
+        )
+        Book.objects.filter(pk=self.book.pk).update(stock=1)
+
+        response = self.client.post(
+            "/api/books/cart/pay/mock/",
+            {"succeed": True, "idempotency_key": str(uuid.uuid4())},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
+        self.assertTrue(CartItem.objects.filter(cart__user=self.user).exists())
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.stock, 1)
 
     def test_mock_payment_requires_authentication_and_non_empty_cart(self):
         self.assertEqual(

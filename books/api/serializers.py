@@ -158,6 +158,7 @@ class CartSyncSerializer(serializers.Serializer):
 
 class MockPaymentSerializer(serializers.Serializer):
     succeed = serializers.BooleanField(default=True)
+    idempotency_key = serializers.UUIDField(required=False)
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
